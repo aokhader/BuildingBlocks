@@ -1,7 +1,7 @@
-export default function Home() {
-  return (
-    <div className="flex flex-1 items-center justify-center">
-      <h1 className="text-2xl font-semibold">Building Blocks</h1>
-    </div>
-  );
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+
+export default async function Home() {
+  const { isAuthenticated } = await auth();
+  redirect(isAuthenticated ? "/editor" : (process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL ?? "/sign-in"));
 }
