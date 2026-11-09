@@ -11,7 +11,13 @@ function isPublicPath(pathname: string) {
 
 // Everything except the auth pages requires a session.
 export default clerkMiddleware(async (auth, req) => {
-  if (!isPublicPath(req.nextUrl.pathname)) await auth.protect();
+  const { pathname } = req.nextUrl;
+  // API callers get a JSON 401 instead of Clerk's redirect/404.
+  if (pathname.startsWith("/api/")) {
+    if (!(await auth()).userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    return;
+  }
+  if (!isPublicPath(pathname)) await auth.protect();
 });
 
 export const config = {

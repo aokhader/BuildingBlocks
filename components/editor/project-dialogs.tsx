@@ -3,8 +3,7 @@ import type { FormEvent } from "react";
 import { EditorDialog } from "@/components/editor/editor-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { ProjectDialogsState } from "@/hooks/use-project-dialogs";
-import { toSlug } from "@/lib/slug";
+import type { ProjectActionsState } from "@/hooks/use-project-actions";
 
 const FORM_ID = "project-dialog-form";
 
@@ -12,11 +11,13 @@ export function ProjectDialogs({
   dialog,
   isOpen,
   name,
+  roomId,
+  error,
   isSubmitting,
   setName,
   onOpenChange,
   submit,
-}: ProjectDialogsState) {
+}: ProjectActionsState) {
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     void submit();
@@ -77,16 +78,17 @@ export function ProjectDialogs({
               disabled={isSubmitting}
               className="rounded-xl"
             />
-            <p className="text-xs text-copy-muted">
-              Slug:{" "}
-              {dialog.type === "rename" && dialog.project.slug !== toSlug(name) && (
-                <span className="font-mono text-copy-faint line-through">
-                  {dialog.project.slug}
-                </span>
-              )}{" "}
-              <span className="font-mono text-copy-secondary">{toSlug(name) || "—"}</span>
-            </p>
+            {dialog.type === "create" && (
+              <p className="text-xs text-copy-muted">
+                Room ID: <span className="font-mono text-copy-secondary">{roomId}</span>
+              </p>
+            )}
           </>
+        )}
+        {error && (
+          <p role="alert" className="text-xs text-error">
+            {error}
+          </p>
         )}
       </form>
     </EditorDialog>

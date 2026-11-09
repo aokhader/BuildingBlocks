@@ -1,29 +1,30 @@
+import Link from "next/link";
 import { FolderOpen, Pencil, Plus, Trash2, Users, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Project } from "@/lib/mock-projects";
+import type { ProjectSummary } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 
 interface ProjectSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  projects: Project[];
+  owned: ProjectSummary[];
+  shared: ProjectSummary[];
   onCreateProject: () => void;
-  onRenameProject: (project: Project) => void;
-  onDeleteProject: (project: Project) => void;
+  onRenameProject: (project: ProjectSummary) => void;
+  onDeleteProject: (project: ProjectSummary) => void;
 }
 
 export function ProjectSidebar({
   isOpen,
   onClose,
-  projects,
+  owned,
+  shared,
   onCreateProject,
   onRenameProject,
   onDeleteProject,
 }: ProjectSidebarProps) {
-  const owned = projects.filter((p) => p.isOwner);
-  const shared = projects.filter((p) => !p.isOwner);
   const itemProps = { onRename: onRenameProject, onDelete: onDeleteProject };
 
   return (
@@ -64,7 +65,7 @@ export function ProjectSidebar({
           </TabsContent>
           <TabsContent value="shared" className="overflow-y-auto">
             {shared.length ? (
-              <ProjectList projects={shared} {...itemProps} />
+              <ProjectList projects={shared} />
             ) : (
               <EmptyState icon={Users} message="No shared projects" />
             )}
@@ -83,9 +84,10 @@ export function ProjectSidebar({
 }
 
 interface ProjectListProps {
-  projects: Project[];
-  onRename: (project: Project) => void;
-  onDelete: (project: Project) => void;
+  projects: ProjectSummary[];
+  // Actions only for owned projects.
+  onRename?: (project: ProjectSummary) => void;
+  onDelete?: (project: ProjectSummary) => void;
 }
 
 function ProjectList({ projects, onRename, onDelete }: ProjectListProps) {
@@ -96,8 +98,10 @@ function ProjectList({ projects, onRename, onDelete }: ProjectListProps) {
           key={project.id}
           className="flex items-center gap-1 rounded-xl px-3 py-2 text-sm text-copy-secondary hover:bg-subtle"
         >
-          <span className="flex-1 truncate">{project.name}</span>
-          {project.isOwner && (
+          <Link href={`/editor/${project.id}`} className="flex-1 truncate hover:text-copy-primary">
+            {project.name}
+          </Link>
+          {onRename && onDelete && (
             <>
               <Button
                 variant="ghost"
