@@ -11,19 +11,27 @@ import {
   Background,
   BackgroundVariant,
   ConnectionMode,
-  MiniMap,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
+  type EdgeTypes,
   type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Component, useState, type DragEvent, type ReactNode } from "react";
 
+import { CanvasControls } from "@/components/editor/canvas-controls";
+import {
+  CanvasEdge as CanvasEdgeView,
+  defaultEdgeOptions,
+} from "@/components/editor/canvas-edge";
 import { CanvasNode as CanvasNodeView } from "@/components/editor/canvas-node";
 import { ShapePanel } from "@/components/editor/shape-panel";
+import type { CanvasTemplate } from "@/components/editor/starter-templates";
+import { StarterTemplatesModal } from "@/components/editor/starter-templates-modal";
 import {
   DEFAULT_NODE_COLOR,
+  DEFAULT_NODE_TEXT_COLOR,
   NODE_SHAPES,
   SHAPE_DRAG_TYPE,
   type CanvasEdge,
@@ -32,6 +40,7 @@ import {
 } from "@/types/canvas";
 
 const nodeTypes: NodeTypes = { canvasNode: CanvasNodeView };
+const edgeTypes: EdgeTypes = { canvasEdge: CanvasEdgeView };
 
 let nodeCounter = 0;
 
@@ -53,7 +62,15 @@ function readShapePayload(event: DragEvent): ShapeDragPayload | null {
   return null;
 }
 
-export function CollaborativeCanvas({ roomId }: { roomId: string }) {
+interface TemplatesModalProps {
+  isTemplatesOpen: boolean;
+  onTemplatesOpenChange: (open: boolean) => void;
+}
+
+export function CollaborativeCanvas({
+  roomId,
+  ...templatesModal
+}: { roomId: string } & TemplatesModalProps) {
   return (
     <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
       <RoomProvider
@@ -66,7 +83,7 @@ export function CollaborativeCanvas({ roomId }: { roomId: string }) {
               fallback={<CanvasMessage>Loading canvas…</CanvasMessage>}
             >
               <ReactFlowProvider>
-                <Canvas />
+                <Canvas {...templatesModal} />
               </ReactFlowProvider>
             </ClientSideSuspense>
           </ThrowOnConnectionError>
@@ -76,14 +93,34 @@ export function CollaborativeCanvas({ roomId }: { roomId: string }) {
   );
 }
 
-function Canvas() {
+function Canvas({ isTemplatesOpen, onTemplatesOpenChange }: TemplatesModalProps) {
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onDelete } =
     useLiveblocksFlow<CanvasNode, CanvasEdge>({
       suspense: true,
       nodes: { initial: [] },
       edges: { initial: [] },
     });
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
+
+  function importTemplate(template: CanvasTemplate) {
+    // Fresh IDs per import, so re-importing never collides with nodes still being removed.
+    const suffix = Date.now().toString(36);
+    const id = (base: string) => `${base}-${suffix}`;
+    // Clear first: the template replaces the canvas instead of landing on top of it.
+    onEdgesChange(edges.map((e) => ({ type: "remove", id: e.id })));
+    onNodesChange(nodes.map((n) => ({ type: "remove", id: n.id })));
+    onNodesChange(
+      template.nodes.map((n) => ({ type: "add", item: { ...n, id: id(n.id) } })),
+    );
+    onEdgesChange(
+      template.edges.map((e) => ({
+        type: "add",
+        item: { ...e, id: id(e.id), source: id(e.source), target: id(e.target) },
+      })),
+    );
+    // React Flow queues this until the new nodes are measured.
+    fitView({ duration: 200 });
+  }
 
   function onDragOver(event: DragEvent) {
     if (!event.dataTransfer.types.includes(SHAPE_DRAG_TYPE)) return;
@@ -107,7 +144,12 @@ function Canvas() {
           position: { x: center.x - width / 2, y: center.y - height / 2 },
           width,
           height,
-          data: { label: "", color: DEFAULT_NODE_COLOR, shape },
+          data: {
+            label: "",
+            color: DEFAULT_NODE_COLOR,
+            textColor: DEFAULT_NODE_TEXT_COLOR,
+            shape,
+          },
         },
       },
     ]);
@@ -123,6 +165,8 @@ function Canvas() {
         onConnect={onConnect}
         onDelete={onDelete}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={defaultEdgeOptions}
         connectionMode={ConnectionMode.Loose}
         fitView
         colorMode="dark"
@@ -130,14 +174,14 @@ function Canvas() {
         className="[--xy-background-color:var(--bg-base)]"
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} color="var(--border-subtle)" />
-        <MiniMap
-          bgColor="var(--bg-surface)"
-          maskColor="rgba(8, 8, 9, 0.6)"
-          nodeColor="var(--bg-subtle)"
-          className="overflow-hidden rounded-xl border border-surface-border"
-        />
         <ShapePanel />
+        <CanvasControls />
       </ReactFlow>
+      <StarterTemplatesModal
+        open={isTemplatesOpen}
+        onOpenChange={onTemplatesOpenChange}
+        onImport={importTemplate}
+      />
     </div>
   );
 }

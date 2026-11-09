@@ -1,6 +1,6 @@
 "use client";
 
-import { Panel } from "@xyflow/react";
+import { Panel, useStore } from "@xyflow/react";
 import {
   Circle,
   Cylinder,
@@ -10,15 +10,18 @@ import {
   RectangleHorizontal,
   type LucideIcon,
 } from "lucide-react";
-import type { DragEvent } from "react";
+import { useRef, type DragEvent } from "react";
+
+import { ShapeView } from "@/components/editor/canvas-node";
 
 import {
+  DEFAULT_NODE_COLOR,
   SHAPE_DRAG_TYPE,
   type NodeShape,
   type ShapeDragPayload,
 } from "@/types/canvas";
 
-const SHAPES: {
+export const SHAPES: {
   shape: NodeShape;
   label: string;
   icon: LucideIcon;
@@ -57,30 +60,64 @@ const SHAPES: {
   },
 ];
 
-function onDragStart(event: DragEvent, payload: ShapeDragPayload) {
-  event.dataTransfer.setData(SHAPE_DRAG_TYPE, JSON.stringify(payload));
-  event.dataTransfer.effectAllowed = "move";
-}
-
 export function ShapePanel() {
+  // Ghost matches the on-screen size of the node that the drop will create.
+  const zoom = useStore((state) => state.transform[2]);
+  const ghosts = useRef<Partial<Record<NodeShape, HTMLDivElement | null>>>({});
+
+  function onDragStart(event: DragEvent, payload: ShapeDragPayload) {
+    event.dataTransfer.setData(SHAPE_DRAG_TYPE, JSON.stringify(payload));
+    event.dataTransfer.effectAllowed = "move";
+    const ghost = ghosts.current[payload.shape];
+    if (ghost) {
+      // Native drag image: follows the cursor, removed by the browser on drop or cancel.
+      event.dataTransfer.setDragImage(
+        ghost,
+        (payload.width * zoom) / 2,
+        (payload.height * zoom) / 2,
+      );
+    }
+  }
+
   return (
-    <Panel
-      position="bottom-center"
-      className="flex items-center gap-1 rounded-full border border-surface-border bg-surface/90 p-1.5 backdrop-blur"
-    >
-      {SHAPES.map(({ shape, label, icon: Icon, width, height }) => (
-        <button
-          key={shape}
-          type="button"
-          draggable
-          onDragStart={(event) => onDragStart(event, { shape, width, height })}
-          title={`Drag to add ${label.toLowerCase()}`}
-          aria-label={`Add ${label.toLowerCase()}`}
-          className="flex h-10 w-10 cursor-grab items-center justify-center rounded-full text-copy-secondary transition-colors hover:bg-subtle hover:text-copy-primary active:cursor-grabbing"
-        >
-          <Icon className="h-5 w-5" />
-        </button>
-      ))}
-    </Panel>
+    <>
+      <Panel
+        position="bottom-center"
+        className="flex items-center gap-1 rounded-full border border-surface-border bg-surface/90 p-1.5 backdrop-blur"
+      >
+        {SHAPES.map(({ shape, label, icon: Icon, width, height }) => (
+          <button
+            key={shape}
+            type="button"
+            draggable
+            onDragStart={(event) =>
+              onDragStart(event, { shape, width, height })
+            }
+            title={`Drag to add ${label.toLowerCase()}`}
+            aria-label={`Add ${label.toLowerCase()}`}
+            className="flex h-10 w-10 cursor-grab items-center justify-center rounded-full text-copy-secondary transition-colors hover:bg-subtle hover:text-copy-primary active:cursor-grabbing"
+          >
+            <Icon className="h-5 w-5" />
+          </button>
+        ))}
+      </Panel>
+      {/* Off-screen but rendered: setDragImage needs a painted element. */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed top-0 -left-[9999px]"
+      >
+        {SHAPES.map(({ shape, width, height }) => (
+          <div
+            key={shape}
+            ref={(el) => {
+              ghosts.current[shape] = el;
+            }}
+            style={{ width: width * zoom, height: height * zoom }}
+          >
+            <ShapeView shape={shape} color={DEFAULT_NODE_COLOR} />
+          </div>
+        ))}
+      </div>
+    </>
   );
 }

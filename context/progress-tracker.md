@@ -8,7 +8,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Feature 12: Shape panel (`context/feature-specs/12-shape-panel.md`) — done
+- Feature 18: Starter templates (`context/feature-specs/18-starter-template.md`) — done
 
 ## Completed
 
@@ -86,6 +86,42 @@ Update this file whenever the current phase, active feature, or implementation s
   - [x] Node: ID `${shape}-${Date.now()}-${counter}`, type `canvasNode`, `width`/`height` from payload, data `{ label: "", color: DEFAULT_NODE_COLOR, shape }`
   - [x] `components/editor/canvas-node.tsx` — every shape is a bordered rectangle with centered label (border turns brand cyan when selected); registered as `nodeTypes.canvasNode`
   - [x] `npm run build`, lint clean
+- 13 Node shape:
+  - [x] `canvas-node.tsx` exports `ShapeView` (shape, color, label?, selected?): rectangle/circle/pill via CSS radius + border; diamond/hexagon/cylinder via SVG paths in a 100x100 viewBox stretched to the node (`preserveAspectRatio="none"`, non-scaling stroke). Border `--border-subtle` at rest, `--accent-primary` when selected. `CanvasNode` renders `ShapeView` from `data`, still synced via Liveblocks
+  - [x] Shape panel drag ghost: one off-screen `ShapeView` per shape at default size x current zoom; `onDragStart` passes it to `dataTransfer.setDragImage`, centered on the cursor (matches where the drop centers the node). The browser removes the image on drop or cancel. Node creation unchanged
+  - [x] `npm run build`, lint clean
+- 14 Node editing:
+  - [x] `CanvasNode` renders React Flow `NodeResizer` while selected: 7px dark handles with cyan border, faint cyan outline, min 40x40. Resize emits `dimensions`/`position` changes through the existing `onNodesChange`, synced by Liveblocks
+  - [x] Inline label: double-click anywhere on the node (a `nopan` wrapper around `ShapeView`) opens a `textarea` overlaid on a hidden copy of the text in one CSS grid cell (box sizes from the text, no layout shift); `Label` placeholder in `text-copy-faint` when empty. Typing calls `updateNodeData` (a `replace` change, synced by Liveblocks); blur or `Escape` closes. Textarea has `nodrag nopan nowheel`
+  - [x] `ShapeView` `label` prop widened to `ReactNode`; shape rendering, shape panel, drag ghost and node creation unchanged
+  - [x] `npm run build`, lint clean
+- 15 Node color toolbar:
+  - [x] `types/canvas.ts` `NODE_COLORS` — 8 `{ name, fill, text }` pairs from `ui-context.md` (not in `globals.css`); `DEFAULT_NODE_COLOR`/`DEFAULT_NODE_TEXT_COLOR` are the first pair. `CanvasNodeData.textColor` is optional (older nodes fall back to the default text color); new nodes store both
+  - [x] `CanvasNode` renders React Flow `NodeToolbar` (top, 10px offset; shown when the node is the only selected one) with one round swatch per pair: fill background, text-color border, active = `ring-copy-primary` with offset, hover = tight `0 0 6px 1px` glow in the text color. Toolbar has `nodrag nopan`
+  - [x] Swatch click calls `updateNodeData(id, { color, textColor })` (Liveblocks-synced, no server calls); `ShapeView` takes `textColor` for the label
+  - [x] `npm run build`, lint clean
+- 16 Edge behavior:
+  - [x] `CanvasNode` renders four `Handle`s (top/right/bottom/left, all `type="source"` with the side as ID; loose mode connects any to any): 8px white dots with a dark border, hidden by default and faded in while the node is selected, hovered (pointer state on the body and the handles), or the target of an in-progress connection (`useConnection` `toNode`)
+  - [x] `ReactFlow` `defaultEdgeOptions`: type `canvasEdge`, `ArrowClosed` end marker, stroke `EDGE_COLOR` (`#f8fafc`, `types/canvas.ts`) 1.5px with round caps. React Flow merges these into the connection before `onConnect`, and Liveblocks' `addEdge` keeps them
+  - [x] `components/editor/canvas-edge.tsx` (`edgeTypes.canvasEdge`): `getSmoothStepPath` right-angle routing, `BaseEdge` at 50% opacity at rest and 100% when hovered or selected, `interactionWidth={24}` hit area
+  - [x] Labels: double-click the edge or its label opens an input in `EdgeLabelRenderer`, placed at the `getSmoothStepPath` `labelX`/`labelY` midpoint; `size` grows with the text; blur/Enter/Escape saves via `updateEdgeData` (the `onEdgesChange` replace flow, synced by Liveblocks). Saved labels are pill badges; a hovered or selected edge with no label shows a faint "Double-click to label" hint. Label wrapper is `nodrag nopan`
+  - [x] `CanvasEdge` data is now `{ label?: string }`
+  - [x] `npm run build`, lint clean
+- 17 Canvas ergonomics:
+  - [x] `components/editor/canvas-controls.tsx` — React Flow `Panel` at bottom-left (`z-10`, same pill styling as the shape panel): zoom out / fit view / zoom in, thin divider, undo / redo
+  - [x] Zoom buttons call the `useReactFlow` instance (`zoomOut`/`fitView`/`zoomIn`, 200ms animation)
+  - [x] Undo/redo use Liveblocks `useUndo`/`useRedo`; `useCanUndo`/`useCanRedo` disable the buttons (dimmed to 40% opacity)
+  - [x] `hooks/use-keyboard-shortcuts.ts` `useKeyboardShortcuts(flow, undo, redo)` — `window` keydown; skips inputs, textareas, selects, and contentEditable. `+`/`=` zoom in, `-` zoom out (only without Ctrl/Cmd, so browser page zoom still works), `Cmd/Ctrl+Z` undo, `Cmd/Ctrl+Shift+Z` and `Cmd/Ctrl+Y` redo
+  - [x] Removed the `MiniMap`
+  - [x] `npm run build`, lint clean
+- 18 Starter templates:
+  - [x] `components/editor/starter-templates.ts` — `CanvasTemplate` `{ id, name, description, nodes, edges }` on the shared `CanvasNode`/`CanvasEdge` types; `CANVAS_TEMPLATES`: Microservices, CI/CD Pipeline, Event-Driven System. `node()` helper takes a `NODE_COLORS` name and the shape panel's default size per shape (`SHAPES` now exported); `edge()` applies `defaultEdgeOptions` plus explicit side handles and optional label
+  - [x] `defaultEdgeOptions` moved from `collaborative-canvas.tsx` to `canvas-edge.tsx` (exported), so template data doesn't import the canvas module (import cycle)
+  - [x] `components/editor/starter-templates-modal.tsx` — `EditorDialog` (new optional `className`, here `sm:max-w-3xl`) with a scrollable two-column card grid: preview, name, description, `Import` button (calls `onImport`, then closes)
+  - [x] Preview: one plain `<svg>` per card whose `viewBox` is the node bounds + padding, fitted to a fixed `h-40` box; edges are straight lines between node centers; nodes use their color and shape (`SVG_SHAPES` paths from `canvas-node.tsx`, now exported; rounded `rect` for rectangle/pill/circle)
+  - [x] Navbar `Templates` button (`LayoutTemplate`, workspace only) → `EditorShell` `isTemplatesOpen` → passed through `CollaborativeCanvas`; the modal renders inside `Canvas` so import uses its Liveblocks flow state directly
+  - [x] Import: remove all edges, remove all nodes, then add template nodes and edges through `onNodesChange`/`onEdgesChange` (Liveblocks-synced), IDs suffixed per import; then `fitView` (React Flow queues it until the new nodes are measured)
+  - [x] `npm run build`, typecheck, lint clean
 
 ## In Progress
 
@@ -93,7 +129,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Shape-specific node visuals, connection handles, `NODE_COLORS` palette, custom edges, canvas controls, live cursors.
+- Live cursors.
+- Starter template import is several Liveblocks changes, so undo may revert it in steps rather than all at once.
 
 ## Open Questions
 
@@ -122,6 +159,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - Canvas looked like a floating card: React Flow's `colorMode="dark"` paints `#141414` over the page. `ReactFlow` now sets `--xy-background-color: var(--bg-base)`, dots use `--border-subtle`, and the minimap uses project tokens.
 - Dropped shapes all rendered as the same rounded rectangle, so drag-and-drop looked broken (the pipeline itself was correct). `canvas-node.tsx` now renders each shape: CSS radius for rectangle/circle/pill, inline SVG for diamond/hexagon/cylinder.
 - Sidebars get an elevation shadow only while open and become `invisible` when closed (visibility transitions with the slide), so nothing peeks past the viewport edge.
+- Label text jumped up a line while editing: the textarea's default `rows=2` made the grid cell a line taller than the text. Now `rows={1}` + `h-full`.
 
 ## Session Notes
 

@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 interface EditorDialogProps {
   open: boolean;
@@ -16,6 +17,7 @@ interface EditorDialogProps {
   description?: string;
   footer?: ReactNode;
   children?: ReactNode;
+  className?: string;
 }
 
 // Shared dialog pattern: project tokens over the shadcn primitive, which stays untouched.
@@ -26,10 +28,13 @@ export function EditorDialog({
   description,
   footer,
   children,
+  className,
 }: EditorDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-3xl border-surface-border bg-elevated/95 backdrop-blur-xl">
+      <DialogContent
+        className={cn("rounded-3xl border-surface-border bg-elevated/95 backdrop-blur-xl", className)}
+      >
         <DialogHeader>
           <DialogTitle className="text-copy-primary">{title}</DialogTitle>
           {description && (

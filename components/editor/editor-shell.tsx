@@ -24,6 +24,7 @@ export function EditorShell({ owned, shared, activeProject }: EditorShellProps) 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
   const actions = useProjectActions();
 
   return (
@@ -36,6 +37,7 @@ export function EditorShell({ owned, shared, activeProject }: EditorShellProps) 
           isAiSidebarOpen,
           onToggleAiSidebar: () => setIsAiSidebarOpen((open) => !open),
           onShare: () => setIsShareOpen(true),
+          onOpenTemplates: () => setIsTemplatesOpen(true),
         })}
       />
       <ProjectSidebar
@@ -52,7 +54,12 @@ export function EditorShell({ owned, shared, activeProject }: EditorShellProps) 
       {activeProject ? (
         <>
           <main className="min-h-0 flex-1 bg-base">
-            <CollaborativeCanvas key={activeProject.id} roomId={activeProject.id} />
+            <CollaborativeCanvas
+              key={activeProject.id}
+              roomId={activeProject.id}
+              isTemplatesOpen={isTemplatesOpen}
+              onTemplatesOpenChange={setIsTemplatesOpen}
+            />
           </main>
           <aside
             aria-label="AI assistant"
