@@ -64,8 +64,12 @@ function LinkSection({ projectId }: { projectId: string }) {
   }, [copied]);
 
   async function copyLink() {
-    await navigator.clipboard.writeText(`${window.location.origin}/editor/${projectId}`);
-    setCopied(true);
+    try{
+      await navigator.clipboard.writeText(`${window.location.origin}/editor/${projectId}`);
+      setCopied(true);
+    } catch (err) {
+      console.error("Failed to copy link", err);
+    }
   }
 
   return (
