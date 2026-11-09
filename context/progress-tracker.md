@@ -8,7 +8,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Feature 09: Share dialog (`context/feature-specs/09-share-dialog.md`) — done
+- Feature 12: Shape panel (`context/feature-specs/12-shape-panel.md`) — done
 
 ## Completed
 
@@ -66,6 +66,26 @@ Update this file whenever the current phase, active feature, or implementation s
   - [x] Dialog split into bordered `rounded-2xl` cards (header divider, Workspace link card, invite card with `Mail` icon, "People with access" + total count, one card per person with `OWNER`/`COLLABORATOR` badge and `Trash2` remove). `GET` also returns `owner` (Clerk lookup by `ownerId` via `getProjectOwner`; `null` hides the row)
   - [x] Fixed `use-project-actions` still reading the old `projectId` route param (now `roomId`), which broke the redirect after deleting the open project
   - [x] `npm run build`, typecheck, lint clean
+- 10 Liveblocks setup:
+  - [x] `liveblocks.config.ts` — Presence `{ cursor: { x, y } | null, isThinking }`; UserMeta `{ id, info: { name, avatar, color } }`. Unused type slots (Storage, RoomEvent, ...) omitted: empty `{}` fails lint
+  - [x] `@liveblocks/node` installed (spec assumed it was; only client/react packages were present)
+  - [x] `lib/liveblocks.ts` — `getLiveblocks()` lazily creates the node client from `LIVEBLOCKS_SECRET_KEY`, cached on `global` (lazy so `next build` doesn't need the secret); `getUserColor(userId)` hashes the ID into a fixed 10-color palette
+  - [x] `POST /api/liveblocks-auth` — body `{ room }` (room ID == project ID); `401` signed out, `400` missing room, `403` no project access (`getProjectRole`); `getOrCreateRoom(room, { defaultAccesses: [] })`; access-token session with `FULL_ACCESS` on that room and `userInfo` `{ name (fullName ?? username ?? email), avatar (Clerk imageUrl), color }`
+  - [x] `npm run build`, typecheck, lint clean
+- 11 Base canvas:
+  - [x] `types/canvas.ts` — `NODE_SHAPES`, `CanvasNodeData` `{ label, color, shape }`, `CanvasNode` (type `canvasNode`), `CanvasEdge` (type `canvasEdge`)
+  - [x] `components/editor/collaborative-canvas.tsx` (client) — `LiveblocksProvider` (`/api/liveblocks-auth`) → `RoomProvider` (room = project ID, presence `{ cursor: null, isThinking: false }`) → error boundary → `ClientSideSuspense` ("Loading canvas…")
+  - [x] Connection errors: `useErrorListener` rethrows `ROOM_CONNECTION_ERROR` during render (outside the suspense boundary) so the fallback shows instead of loading forever
+  - [x] `useLiveblocksFlow<CanvasNode, CanvasEdge>({ suspense: true })` with empty initial nodes/edges, wired into `ReactFlow` (loose connection mode, `fitView`, dark color mode, `MiniMap`, dots `Background`)
+  - [x] Workspace page stays server-side; `EditorShell` replaces the placeholder with the canvas (keyed by project ID)
+  - [x] `npm run build`, lint clean
+- 12 Shape panel:
+  - [x] `components/editor/shape-panel.tsx` — React Flow `Panel` at bottom-center, pill toolbar of draggable icon buttons (rectangle 160×80, diamond 160×160, circle 100×100, pill 160×64, cylinder 120×100, hexagon 150×100)
+  - [x] Drag payload `{ shape, width, height }` as JSON under `SHAPE_DRAG_TYPE` (`types/canvas.ts`, with `ShapeDragPayload` and `DEFAULT_NODE_COLOR` `#1F1F1F`)
+  - [x] Canvas wrapper handles `dragover`/`drop`; payload validated (known shape, sane size), `screenToFlowPosition` (canvas wrapped in `ReactFlowProvider`), node centered on cursor and added via `onNodesChange([{ type: "add" }])` so it syncs to Liveblocks
+  - [x] Node: ID `${shape}-${Date.now()}-${counter}`, type `canvasNode`, `width`/`height` from payload, data `{ label: "", color: DEFAULT_NODE_COLOR, shape }`
+  - [x] `components/editor/canvas-node.tsx` — every shape is a bordered rectangle with centered label (border turns brand cyan when selected); registered as `nodeTypes.canvasNode`
+  - [x] `npm run build`, lint clean
 
 ## In Progress
 
@@ -73,7 +93,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Workspace canvas at `/editor/[roomId]` (Liveblocks room = project ID).
+- Shape-specific node visuals, connection handles, `NODE_COLORS` palette, custom edges, canvas controls, live cursors.
 
 ## Open Questions
 
@@ -92,13 +112,18 @@ Update this file whenever the current phase, active feature, or implementation s
 - The `bg-base` token is declared as `--background-color-base`, not `--color-base`: a `--color-*` token named `base` also emits a color for `text-base`, which turned all `text-base` text (e.g. shadcn `Input`) near-black. Avoid `--color-*` token names that collide with Tailwind size keywords (`base`, `sm`, `lg`, `xs`, ...).
 
 - Prisma 7 multi-file schema: `prisma7.config.ts` points `schema` at the `prisma/` folder, so `prisma/schema.prisma` holds the generator/datasource and models live in `prisma/models/*.prisma`. The generated client (`app/generated/prisma`) is gitignored; run `npx prisma generate` after install.
+- Liveblocks auth uses access tokens (`prepareSession` + `allow`), not ID tokens: project access lives in our DB, so the auth route is the gate and rooms are created private (`defaultAccesses: []`).
 - Accelerate uses the core `accelerateUrl` client option; `@prisma/extension-accelerate` (query caching) is not installed.
 
 ## Fixed Issues
 
 - Dialog input text was black: `text-base` color collision (above). Fixed in `globals.css`.
 - Rename dialog now shows the slug preview, with the old slug struck through when the new name changes it.
+- Canvas looked like a floating card: React Flow's `colorMode="dark"` paints `#141414` over the page. `ReactFlow` now sets `--xy-background-color: var(--bg-base)`, dots use `--border-subtle`, and the minimap uses project tokens.
+- Dropped shapes all rendered as the same rounded rectangle, so drag-and-drop looked broken (the pipeline itself was correct). `canvas-node.tsx` now renders each shape: CSS radius for rectangle/circle/pill, inline SVG for diamond/hexagon/cylinder.
+- Sidebars get an elevation shadow only while open and become `invisible` when closed (visibility transitions with the slide), so nothing peeks past the viewport edge.
 
 ## Session Notes
 
 - `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in` and `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up` were added to `.env.local` (the spec assumed they existed). Other environments (Vercel, CI) need them too.
+- `LIVEBLOCKS_SECRET_KEY` (`sk_...`) must be set in `.env.local` and deployed envs; it was not present when feature 10 was built.

@@ -3,6 +3,7 @@
 import { Plus, Sparkles } from "lucide-react";
 import { useState } from "react";
 
+import { CollaborativeCanvas } from "@/components/editor/collaborative-canvas";
 import { EditorNavbar } from "@/components/editor/editor-navbar";
 import { ProjectDialogs } from "@/components/editor/project-dialogs";
 import { ProjectSidebar } from "@/components/editor/project-sidebar";
@@ -50,16 +51,17 @@ export function EditorShell({ owned, shared, activeProject }: EditorShellProps) 
 
       {activeProject ? (
         <>
-          {/* shortcut: canvas placeholder until the canvas feature lands. */}
-          <main className="flex min-h-0 flex-1 items-center justify-center bg-base px-6 text-center">
-            <p className="text-copy-muted">Canvas coming soon</p>
+          <main className="min-h-0 flex-1 bg-base">
+            <CollaborativeCanvas key={activeProject.id} roomId={activeProject.id} />
           </main>
           <aside
             aria-label="AI assistant"
             inert={!isAiSidebarOpen}
             className={cn(
-              "fixed top-14 right-0 bottom-0 z-40 flex w-80 flex-col items-center justify-center gap-3 border-l border-surface-border bg-surface/90 px-6 text-center backdrop-blur-md transition-transform duration-200",
-              isAiSidebarOpen ? "translate-x-0" : "translate-x-full"
+              "fixed top-14 right-0 bottom-0 z-40 flex w-80 flex-col items-center justify-center gap-3 border-l border-surface-border bg-surface/90 px-6 text-center backdrop-blur-md transition-[translate,visibility,box-shadow] duration-200",
+              isAiSidebarOpen
+                ? "translate-x-0 shadow-2xl shadow-black/50"
+                : "invisible translate-x-full"
             )}
           >
             <Sparkles className="h-8 w-8 text-ai-text" />

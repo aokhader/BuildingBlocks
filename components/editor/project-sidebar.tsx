@@ -42,8 +42,9 @@ export function ProjectSidebar({
         aria-label="Projects"
         inert={!isOpen}
         className={cn(
-          "fixed top-14 bottom-0 left-0 z-40 flex w-72 flex-col border-r border-surface-border bg-surface/90 backdrop-blur-md transition-transform duration-200",
-          isOpen ? "translate-x-0" : "-translate-x-full"
+          "fixed top-14 bottom-0 left-0 z-40 flex w-72 flex-col border-r border-surface-border bg-surface/90 backdrop-blur-md transition-[translate,visibility,box-shadow] duration-200",
+          // Shadow only while open so no remnant peeks past the edge when hidden.
+          isOpen ? "translate-x-0 shadow-2xl shadow-black/50" : "invisible -translate-x-full"
         )}
       >
         <div className="flex items-center justify-between px-4 py-3">
