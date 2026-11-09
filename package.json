@@ -32,7 +32,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
-    "prisma": "^8.0.0-rc.33",
+    "prisma": "^7.10.1",
     "shadcn": "^4.21.5",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
