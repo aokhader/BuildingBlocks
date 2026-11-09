@@ -8,7 +8,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Feature 18: Starter templates (`context/feature-specs/18-starter-template.md`) — done
+- Feature 19: Presence avatars and live cursors (`context/feature-specs/19-presence-avatar-cursor.md`) — done
 
 ## Completed
 
@@ -123,13 +123,20 @@ Update this file whenever the current phase, active feature, or implementation s
   - [x] Import: remove all edges, remove all nodes, then add template nodes and edges through `onNodesChange`/`onEdgesChange` (Liveblocks-synced), IDs suffixed per import; then `fitView` (React Flow queues it until the new nodes are measured)
   - [x] `npm run build`, typecheck, lint clean
 
+- 19 Presence avatars and live cursors:
+  - [x] `liveblocks.config.ts` Presence is now `{ cursor: { x, y } | null, thinking: boolean }` (renamed from `isThinking`); `RoomProvider` initial presence updated
+  - [x] `components/editor/presence.tsx` `PresenceAvatars` — React Flow `Panel` top-right of the canvas (canvas view only; navbar untouched). Collaborators = `useOthers` minus entries whose ID matches the Clerk `useAuth().userId` (Liveblocks user ID == Clerk user ID). Up to 5 overlapping 28px display-only avatars (photo, else initials on the presence color), `+N` chip, `ring-2` in `--bg-base`; divider only when collaborators exist; then Clerk `UserButton` sized to 28px
+  - [x] `LiveCursors` — overlay inside `ReactFlow`; collaborators' cursors (same filter, so never the current user) as a colored pointer + name badge in the presence color. Cursors are stored in flow coordinates (`screenToFlowPosition`) and projected with `useViewport`, so they point at the same diagram spot at any pan/zoom
+  - [x] `ReactFlow` `onMouseMove` broadcasts the cursor via `useUpdateMyPresence`; `onMouseLeave` sets it to `null`
+  - [x] `npm run build`, lint clean
+
 ## In Progress
 
 - None.
 
 ## Next Up
 
-- Live cursors.
+- In the workspace view the navbar still shows its own `UserButton` (spec: navbar unchanged), so the current user's button appears twice there.
 - Starter template import is several Liveblocks changes, so undo may revert it in steps rather than all at once.
 
 ## Open Questions

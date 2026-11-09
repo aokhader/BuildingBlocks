@@ -108,7 +108,7 @@ export function CanvasNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
   const label = (
     <span className="inline-grid max-w-full align-middle">
       <span
-        className={`col-start-1 row-start-1 break-words whitespace-pre-wrap ${
+        className={`col-start-1 row-start-1 wrap-break-word whitespace-pre-wrap ${
           isEditing ? "invisible" : data.label ? "" : "text-copy-faint"
         }`}
       >

@@ -6,6 +6,7 @@ import {
   LiveblocksProvider,
   RoomProvider,
   useErrorListener,
+  useUpdateMyPresence,
 } from "@liveblocks/react/suspense";
 import {
   Background,
@@ -18,7 +19,13 @@ import {
   type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Component, useState, type DragEvent, type ReactNode } from "react";
+import {
+  Component,
+  useState,
+  type DragEvent,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 
 import { CanvasControls } from "@/components/editor/canvas-controls";
 import {
@@ -26,6 +33,7 @@ import {
   defaultEdgeOptions,
 } from "@/components/editor/canvas-edge";
 import { CanvasNode as CanvasNodeView } from "@/components/editor/canvas-node";
+import { LiveCursors, PresenceAvatars } from "@/components/editor/presence";
 import { ShapePanel } from "@/components/editor/shape-panel";
 import type { CanvasTemplate } from "@/components/editor/starter-templates";
 import { StarterTemplatesModal } from "@/components/editor/starter-templates-modal";
@@ -75,7 +83,7 @@ export function CollaborativeCanvas({
     <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
       <RoomProvider
         id={roomId}
-        initialPresence={{ cursor: null, isThinking: false }}
+        initialPresence={{ cursor: null, thinking: false }}
       >
         <CanvasErrorBoundary>
           <ThrowOnConnectionError>
@@ -101,6 +109,13 @@ function Canvas({ isTemplatesOpen, onTemplatesOpenChange }: TemplatesModalProps)
       edges: { initial: [] },
     });
   const { screenToFlowPosition, fitView } = useReactFlow();
+  const updateMyPresence = useUpdateMyPresence();
+
+  function onMouseMove(event: MouseEvent) {
+    updateMyPresence({
+      cursor: screenToFlowPosition({ x: event.clientX, y: event.clientY }),
+    });
+  }
 
   function importTemplate(template: CanvasTemplate) {
     // Fresh IDs per import, so re-importing never collides with nodes still being removed.
@@ -164,6 +179,8 @@ function Canvas({ isTemplatesOpen, onTemplatesOpenChange }: TemplatesModalProps)
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onDelete={onDelete}
+        onMouseMove={onMouseMove}
+        onMouseLeave={() => updateMyPresence({ cursor: null })}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
@@ -176,6 +193,8 @@ function Canvas({ isTemplatesOpen, onTemplatesOpenChange }: TemplatesModalProps)
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} color="var(--border-subtle)" />
         <ShapePanel />
         <CanvasControls />
+        <PresenceAvatars />
+        <LiveCursors />
       </ReactFlow>
       <StarterTemplatesModal
         open={isTemplatesOpen}

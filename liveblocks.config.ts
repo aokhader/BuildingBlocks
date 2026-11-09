@@ -5,7 +5,7 @@ declare global {
     Presence: {
       // Canvas coordinates; null when the pointer is off the canvas.
       cursor: { x: number; y: number } | null;
-      isThinking: boolean;
+      thinking: boolean;
     };
 
     UserMeta: {
