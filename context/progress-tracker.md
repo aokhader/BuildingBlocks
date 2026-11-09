@@ -8,7 +8,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Feature 04: project dialogs (`context/feature-specs/04-project-dialogs.md`) — done
+- Feature 05: Prisma (`context/feature-specs/05-prisma.md`) — done
 
 ## Completed
 
@@ -32,6 +32,11 @@ Update this file whenever the current phase, active feature, or implementation s
   - [x] Sidebar lists mock projects; rename/delete actions only on owned projects; sidebar `New Project` opens Create; mobile scrim closes sidebar on tap outside
   - [x] `lib/slug.ts` `toSlug()`, `lib/mock-projects.ts` mock data
   - [x] `npm run build`, typecheck, lint clean
+- 05 Prisma:
+  - [x] `prisma/models/project.prisma` — `Project` (ownerId = Clerk user ID, name, description?, `ProjectStatus` DRAFT/ARCHIVED, canvasJsonPath?, timestamps; indexes on ownerId, createdAt) and `ProjectCollaborator` (project relation with cascade delete, email, createdAt; unique projectId+email; indexes on email, projectId+createdAt)
+  - [x] `lib/prisma.ts` — cached singleton; `prisma+postgres://` URLs use `accelerateUrl`, others use `@prisma/adapter-pg`; cached on `global` outside production
+  - [x] Migration `20261109040925_init` applied; client generated to `app/generated/prisma`
+  - [x] `npm run build`, typecheck, lint clean
 
 ## In Progress
 
@@ -39,7 +44,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Next feature spec after 04 (persistence / canvas).
+- Next feature spec after 05 (wire project dialogs to the database).
 
 ## Open Questions
 
@@ -56,6 +61,9 @@ Update this file whenever the current phase, active feature, or implementation s
 - Client hooks live in `hooks/`. Project dialogs are one `EditorDialog` driven by `useProjectDialogs`; the hook keeps the last dialog after close so content doesn't vanish mid-animation.
 - Project data is mock (`lib/mock-projects.ts`) held in hook state; no persistence until a later spec.
 - The `bg-base` token is declared as `--background-color-base`, not `--color-base`: a `--color-*` token named `base` also emits a color for `text-base`, which turned all `text-base` text (e.g. shadcn `Input`) near-black. Avoid `--color-*` token names that collide with Tailwind size keywords (`base`, `sm`, `lg`, `xs`, ...).
+
+- Prisma 7 multi-file schema: `prisma7.config.ts` points `schema` at the `prisma/` folder, so `prisma/schema.prisma` holds the generator/datasource and models live in `prisma/models/*.prisma`. The generated client (`app/generated/prisma`) is gitignored; run `npx prisma generate` after install.
+- Accelerate uses the core `accelerateUrl` client option; `@prisma/extension-accelerate` (query caching) is not installed.
 
 ## Fixed Issues
 
