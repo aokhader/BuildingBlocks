@@ -11,6 +11,7 @@ interface ProjectSidebarProps {
   onClose: () => void;
   owned: ProjectSummary[];
   shared: ProjectSummary[];
+  activeProjectId?: string;
   onCreateProject: () => void;
   onRenameProject: (project: ProjectSummary) => void;
   onDeleteProject: (project: ProjectSummary) => void;
@@ -21,6 +22,7 @@ export function ProjectSidebar({
   onClose,
   owned,
   shared,
+  activeProjectId,
   onCreateProject,
   onRenameProject,
   onDeleteProject,
@@ -58,14 +60,14 @@ export function ProjectSidebar({
           </TabsList>
           <TabsContent value="mine" className="overflow-y-auto">
             {owned.length ? (
-              <ProjectList projects={owned} {...itemProps} />
+              <ProjectList projects={owned} activeId={activeProjectId} {...itemProps} />
             ) : (
               <EmptyState icon={FolderOpen} message="No projects yet" />
             )}
           </TabsContent>
           <TabsContent value="shared" className="overflow-y-auto">
             {shared.length ? (
-              <ProjectList projects={shared} />
+              <ProjectList projects={shared} activeId={activeProjectId} />
             ) : (
               <EmptyState icon={Users} message="No shared projects" />
             )}
@@ -85,20 +87,28 @@ export function ProjectSidebar({
 
 interface ProjectListProps {
   projects: ProjectSummary[];
+  activeId?: string;
   // Actions only for owned projects.
   onRename?: (project: ProjectSummary) => void;
   onDelete?: (project: ProjectSummary) => void;
 }
 
-function ProjectList({ projects, onRename, onDelete }: ProjectListProps) {
+function ProjectList({ projects, activeId, onRename, onDelete }: ProjectListProps) {
   return (
     <ul className="flex flex-col gap-1 py-2">
       {projects.map((project) => (
         <li
           key={project.id}
-          className="flex items-center gap-1 rounded-xl px-3 py-2 text-sm text-copy-secondary hover:bg-subtle"
+          className={cn(
+            "flex items-center gap-1 rounded-xl px-3 py-2 text-sm text-copy-secondary hover:bg-subtle",
+            project.id === activeId && "bg-accent-dim text-brand hover:bg-accent-dim"
+          )}
         >
-          <Link href={`/editor/${project.id}`} className="flex-1 truncate hover:text-copy-primary">
+          <Link
+            href={`/editor/${project.id}`}
+            aria-current={project.id === activeId ? "page" : undefined}
+            className="flex-1 truncate hover:text-copy-primary"
+          >
             {project.name}
           </Link>
           {onRename && onDelete && (

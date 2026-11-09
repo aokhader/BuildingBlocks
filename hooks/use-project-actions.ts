@@ -27,7 +27,7 @@ async function request(url: string, init: RequestInit) {
 
 export function useProjectActions() {
   const router = useRouter();
-  const { projectId: activeProjectId } = useParams<{ projectId?: string }>();
+  const { roomId: activeProjectId } = useParams<{ roomId?: string }>();
   // `dialog` is kept after closing so content doesn't vanish during the close animation.
   const [dialog, setDialog] = useState<ProjectDialog>({ type: "create" });
   const [isOpen, setIsOpen] = useState(false);
