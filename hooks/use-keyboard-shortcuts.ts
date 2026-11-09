@@ -5,7 +5,7 @@ import { useEffect } from "react";
 
 const ZOOM_DURATION = 200;
 
-function isEditable(target: EventTarget | null) {
+export function isEditable(target: EventTarget | null) {
   return (
     target instanceof HTMLElement &&
     (target.isContentEditable ||

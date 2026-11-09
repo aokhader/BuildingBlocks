@@ -13,6 +13,13 @@ import {
 import { useRef, type DragEvent } from "react";
 
 import { ShapeView } from "@/components/editor/canvas-node";
+import type { SaveStatus } from "@/hooks/use-canvas-autosave";
+
+const SAVE_STATUS_TEXT: Record<SaveStatus, string> = {
+  saving: "Saving…",
+  saved: "All changes saved",
+  error: "Autosave failed",
+};
 
 import {
   DEFAULT_NODE_COLOR,
@@ -60,7 +67,7 @@ export const SHAPES: {
   },
 ];
 
-export function ShapePanel() {
+export function ShapePanel({ saveStatus }: { saveStatus?: SaveStatus }) {
   // Ghost matches the on-screen size of the node that the drop will create.
   const zoom = useStore((state) => state.transform[2]);
   const ghosts = useRef<Partial<Record<NodeShape, HTMLDivElement | null>>>({});
@@ -83,23 +90,33 @@ export function ShapePanel() {
     <>
       <Panel
         position="bottom-center"
-        className="flex items-center gap-1 rounded-full border border-surface-border bg-surface/90 p-1.5 backdrop-blur"
+        className="flex flex-col items-center gap-1.5"
       >
-        {SHAPES.map(({ shape, label, icon: Icon, width, height }) => (
-          <button
-            key={shape}
-            type="button"
-            draggable
-            onDragStart={(event) =>
-              onDragStart(event, { shape, width, height })
-            }
-            title={`Drag to add ${label.toLowerCase()}`}
-            aria-label={`Add ${label.toLowerCase()}`}
-            className="flex h-10 w-10 cursor-grab items-center justify-center rounded-full text-copy-secondary transition-colors hover:bg-subtle hover:text-copy-primary active:cursor-grabbing"
+        {saveStatus && (
+          <p
+            role="status"
+            className={`text-xs ${saveStatus === "error" ? "text-error" : "text-copy-muted"}`}
           >
-            <Icon className="h-5 w-5" />
-          </button>
-        ))}
+            {SAVE_STATUS_TEXT[saveStatus]}
+          </p>
+        )}
+        <div className="flex items-center gap-1 rounded-full border border-surface-border bg-surface/90 p-1.5 backdrop-blur">
+          {SHAPES.map(({ shape, label, icon: Icon, width, height }) => (
+            <button
+              key={shape}
+              type="button"
+              draggable
+              onDragStart={(event) =>
+                onDragStart(event, { shape, width, height })
+              }
+              title={`Drag to add ${label.toLowerCase()}`}
+              aria-label={`Add ${label.toLowerCase()}`}
+              className="flex h-10 w-10 cursor-grab items-center justify-center rounded-full text-copy-secondary transition-colors hover:bg-subtle hover:text-copy-primary active:cursor-grabbing"
+            >
+              <Icon className="h-5 w-5" />
+            </button>
+          ))}
+        </div>
       </Panel>
       {/* Off-screen but rendered: setDragImage needs a painted element. */}
       <div

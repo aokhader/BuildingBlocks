@@ -8,7 +8,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Feature 14 (revised): Node editing — deletion and multi-selection added (`context/feature-specs/14-node-editing.md`) — done
+- Feature 21: Canvas autosave (`context/feature-specs/21-canvas-autosave.md`) — done
 
 ## Completed
 
@@ -133,6 +133,24 @@ Update this file whenever the current phase, active feature, or implementation s
   - [x] `ReactFlow` `onMouseMove` broadcasts the cursor via `useUpdateMyPresence`; `onMouseLeave` sets it to `null`
   - [x] `npm run build`, lint clean
 
+- 20 AI sidebar shell:
+  - [x] `components/editor/ai-sidebar.tsx` `AiSidebar` (`isOpen`, `onClose`; state stays in `EditorShell`) replaces the inline placeholder `<aside>`. Same fixed right slide-over, `inert`/`invisible` when closed, shadow only while open; surface now `bg-base/95` + `border-surface-border`
+  - [x] Header: bot icon, `AI Workspace` (`text-copy-primary`), `Collaborate with BuildingBlocks` (`text-copy-muted`), ghost close button
+  - [x] shadcn `Tabs`: `AI Architect` / `Specs`; active = `bg-ai/15 text-ai-text`, inactive `text-copy-muted`
+  - [x] AI Architect: `ScrollArea` chat, empty state (bot icon, description, 3 starter chips `bg-subtle text-ai-text` that fill the input), user bubbles right (`bg-accent-dim border-2 border-brand/50 text-copy-primary`), assistant bubbles left (`bg-elevated border-surface-border text-ai-text`), auto-scroll to newest. `Textarea` grows via `field-sizing-content` between 104px and 176px (raised from the spec's 72px so the placeholder clears the corner send button); Enter sends, Shift+Enter newline; send button (`bg-ai text-white`) sits inside the textarea's bottom-right corner (textarea `pb-12` keeps text clear of it). Sending only appends the user message (no AI yet)
+  - [x] Specs: `Generate Spec` button (`bg-ai text-white`, no action) + static demo card (`bg-elevated`, `border-surface-border`, `FileText` icon, title, snippet, disabled download)
+  - [x] Spec token names mapped to existing ones (none added): `text-primary-text` → `text-copy-primary`, `text-muted-text` → `text-copy-muted`, `bg-accent`/`text-accent(-text)` → AI accent `bg-ai`/`text-ai-text` (shadcn `bg-accent` is the grey subtle surface), `bg-brand-dim` → `bg-accent-dim`
+  - [x] `npm run build`, lint clean
+
+- 21 Canvas autosave:
+  - [x] `@vercel/blob` installed. Reuses the existing `Project.canvasJsonPath` for the blob URL (no migration); Prisma holds metadata only
+  - [x] `app/api/projects/[projectId]/canvas/route.ts` — `GET` reads `canvasJsonPath`, fetches the blob (`useCache: false`), returns `{ canvas }` (`null` when never saved); `PUT { nodes, edges }` (`400` unless both are arrays) uploads to `canvas/<projectId>.json` and stores the URL. Owner or collaborator; `401` signed out, `404` missing or no access
+  - [x] The Blob store is private: blobs use `access: "private"`, one fixed path per project overwritten in place (`allowOverwrite`), so no orphaned blobs
+  - [x] `hooks/use-canvas-autosave.ts` `useCanvasAutosave(projectId, nodes, edges, applySaved)` — snapshots nodes/edges as JSON without `selected`/`dragging`/`resizing` (clicks don't save); 1.5s debounce; status `saving` (unsaved changes or in flight) / `saved` / `error`; `saveNow` for the button
+  - [x] Load: if the Liveblocks room has no nodes and no edges on mount, `GET` the saved canvas and add it via `onNodesChange`/`onEdgesChange` (then `fitView`); a room with content skips the load. Autosave stays off until the load finishes, and stays off if the load fails (shows `error`), so an empty room never overwrites the saved canvas
+  - [x] Navbar Save button (workspace only) reflects manual saves only; autosave runs silently in the background. `Save` (`Save` icon) by default, `Saving...` (spinning `LoaderCircle`) while the click's request is in flight, then `Saved` (`Check`) or `Error` (`CircleAlert`, `text-error`) for 2s before returning to `Save` (`useManualSave` in `editor-navbar.tsx`). `saveNow` returns `Promise<boolean>`; it resolves `false` before the saved canvas has loaded. `Canvas` reports `{ status, saveNow }` up to `EditorShell` via `onSaveChange`
+  - [x] `npm run build`, lint clean; Blob put/overwrite/uncached get verified against the real store
+
 ## In Progress
 
 - None.
@@ -140,6 +158,9 @@ Update this file whenever the current phase, active feature, or implementation s
 ## Next Up
 
 - In the workspace view the navbar still shows its own `UserButton` (spec: navbar unchanged), so the current user's button appears twice there.
+- AI sidebar textarea auto-resize relies on CSS `field-sizing`, unsupported in Firefox/Safari (fixed 104px there).
+- Autosave: edits made in the last 1.5s before closing the tab are not flushed to Blob (the Liveblocks room still has them). Deleting a project does not delete its canvas blob.
+- Loading a saved canvas into an empty room is one Liveblocks change per list, so it is undoable.
 - Starter template import is several Liveblocks changes, so undo may revert it in steps rather than all at once.
 
 ## Open Questions
@@ -171,9 +192,15 @@ Update this file whenever the current phase, active feature, or implementation s
 - Sidebars get an elevation shadow only while open and become `invisible` when closed (visibility transitions with the slide), so nothing peeks past the viewport edge.
 - Double-clicking an edge (or node) to edit its label also zoomed the canvas: React Flow binds `dblclick.zoom` directly on the pane, bypassing its filter, so `nopan` doesn't stop it. `ReactFlow` now sets `zoomOnDoubleClick={false}` (empty-canvas double-click no longer zooms either).
 - Label text jumped up a line while editing: the textarea's default `rows=2` made the grid cell a line taller than the text. Now `rows={1}` + `h-full`.
+- Delete/Backspace deletion now goes through a `keydown` listener in `Canvas` (window-level, skips inputs/textareas/contenteditable via the exported `isEditable`): selected nodes from `useNodes()` and selected edges from `useEdges()`, plus edges attached to deleted nodes (Liveblocks' `onDelete` doesn't cascade), removed with Liveblocks' `onDelete` mutation. `deleteKeyCode={null}`. Note: Liveblocks' `onNodesChange`/`onEdgesChange` ignore `remove` changes.
+- First drop on an empty canvas auto-zoomed: React Flow keeps the `fitView` prop queued until nodes exist. `fitView` is now only set when the room has nodes on mount, and `loadSaved` only calls `fitView()` when the saved canvas has nodes.
+- `next.config.ts` allows `img.clerk.com` via `images.remotePatterns`. `UserButton` renders on the editor home navbar only.
+- Template import never cleared the canvas (Liveblocks ignores `remove` changes). The templates modal now offers "Add to canvas" (template bounds centered in the current view via `getNodesBounds` + `screenToFlowPosition`, viewport unchanged) or "Replace canvas" (`onDelete` on everything, then `fitView`). Both run in one `room.batch` (one undo step) and pre-select the imported nodes and edges (local `select` changes), deselecting anything previously selected.
+- Autosave status indicator above the shape panel (`ShapePanel` `saveStatus`): "Saving…" / "All changes saved" / "Autosave failed".
 - Right-drag selection flashed every node selected at the start: while the box was still a line (0 width or height), `getIntersectingNodes` matched all nodes (`overlap >= box area` with area 0). `use-selection-box` now skips selection until the box has both width and height.
 
 ## Session Notes
 
 - `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in` and `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up` were added to `.env.local` (the spec assumed they existed). Other environments (Vercel, CI) need them too.
+- `BLOB_READ_WRITE_TOKEN` must be set (present in `.env.local`); the store is private, so `access: "public"` fails.
 - `LIVEBLOCKS_SECRET_KEY` (`sk_...`) must be set in `.env.local` and deployed envs; it was not present when feature 10 was built.

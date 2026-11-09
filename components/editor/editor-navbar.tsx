@@ -1,13 +1,44 @@
 import { UserButton } from "@clerk/nextjs";
 import {
+  Check,
+  CircleAlert,
   LayoutTemplate,
+  LoaderCircle,
   PanelLeftClose,
   PanelLeftOpen,
+  Save,
   Share2,
   Sparkles,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+
+const SAVE_LABELS = {
+  idle: { Icon: Save, text: "Save", className: undefined },
+  saving: { Icon: LoaderCircle, text: "Saving...", className: "[&_svg]:animate-spin" },
+  saved: { Icon: Check, text: "Saved", className: undefined },
+  error: { Icon: CircleAlert, text: "Error", className: "text-error" },
+};
+const FLASH_MS = 2000;
+
+// Tracks manual saves only; autosave runs in the background without touching the button.
+// "Saved" / "Error" show briefly, then the button returns to "Save".
+function useManualSave(onSave: (() => Promise<boolean>) | undefined) {
+  const [state, setState] = useState<keyof typeof SAVE_LABELS>("idle");
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  async function save() {
+    if (!onSave) return;
+    clearTimeout(timer.current);
+    setState("saving");
+    const ok = await onSave();
+    setState(ok ? "saved" : "error");
+    timer.current = setTimeout(() => setState("idle"), FLASH_MS);
+  }
+  return { label: SAVE_LABELS[state], save };
+}
 
 interface EditorNavbarProps {
   isSidebarOpen: boolean;
@@ -18,6 +49,7 @@ interface EditorNavbarProps {
   onToggleAiSidebar?: () => void;
   onShare?: () => void;
   onOpenTemplates?: () => void;
+  onSave?: () => Promise<boolean>;
 }
 
 export function EditorNavbar({
@@ -28,8 +60,10 @@ export function EditorNavbar({
   onToggleAiSidebar,
   onShare,
   onOpenTemplates,
+  onSave,
 }: EditorNavbarProps) {
   const Icon = isSidebarOpen ? PanelLeftClose : PanelLeftOpen;
+  const { label: save, save: saveNow } = useManualSave(onSave);
 
   return (
     <header className="flex h-14 shrink-0 items-center border-b border-surface-border bg-surface px-3">
@@ -52,6 +86,18 @@ export function EditorNavbar({
       <div className="flex flex-1 items-center justify-end gap-2">
         {onToggleAiSidebar && (
           <>
+            {onSave && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void saveNow()}
+                aria-live="polite"
+                className={save.className}
+              >
+                <save.Icon />
+                {save.text}
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={onOpenTemplates}>
               <LayoutTemplate />
               Templates
@@ -72,7 +118,8 @@ export function EditorNavbar({
             </Button>
           </>
         )}
-        <UserButton />
+        {/* Editor home only; workspace actions (onToggleAiSidebar) mark the workspace navbar. */}
+        {!onToggleAiSidebar && <UserButton />}
       </div>
     </header>
   );

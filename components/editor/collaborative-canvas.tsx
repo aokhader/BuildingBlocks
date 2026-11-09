@@ -6,6 +6,7 @@ import {
   LiveblocksProvider,
   RoomProvider,
   useErrorListener,
+  useRoom,
   useUpdateMyPresence,
 } from "@liveblocks/react/suspense";
 import {
@@ -14,6 +15,9 @@ import {
   ConnectionMode,
   ReactFlow,
   ReactFlowProvider,
+  getNodesBounds,
+  useEdges,
+  useNodes,
   useReactFlow,
   type EdgeTypes,
   type NodeTypes,
@@ -21,6 +25,8 @@ import {
 import "@xyflow/react/dist/style.css";
 import {
   Component,
+  useEffect,
+  useRef,
   useState,
   type DragEvent,
   type MouseEvent,
@@ -36,7 +42,16 @@ import { CanvasNode as CanvasNodeView } from "@/components/editor/canvas-node";
 import { LiveCursors, PresenceAvatars } from "@/components/editor/presence";
 import { ShapePanel } from "@/components/editor/shape-panel";
 import type { CanvasTemplate } from "@/components/editor/starter-templates";
-import { StarterTemplatesModal } from "@/components/editor/starter-templates-modal";
+import {
+  StarterTemplatesModal,
+  type TemplateImportMode,
+} from "@/components/editor/starter-templates-modal";
+import {
+  useCanvasAutosave,
+  type SaveStatus,
+  type SavedCanvas,
+} from "@/hooks/use-canvas-autosave";
+import { isEditable } from "@/hooks/use-keyboard-shortcuts";
 import { useSelectionBox } from "@/hooks/use-selection-box";
 import {
   DEFAULT_NODE_COLOR,
@@ -71,15 +86,20 @@ function readShapePayload(event: DragEvent): ShapeDragPayload | null {
   return null;
 }
 
-interface TemplatesModalProps {
-  isTemplatesOpen: boolean;
-  onTemplatesOpenChange: (open: boolean) => void;
+export interface CanvasSave {
+  status: SaveStatus;
+  saveNow: () => Promise<boolean>;
 }
 
-export function CollaborativeCanvas({
-  roomId,
-  ...templatesModal
-}: { roomId: string } & TemplatesModalProps) {
+interface CanvasProps {
+  roomId: string;
+  isTemplatesOpen: boolean;
+  onTemplatesOpenChange: (open: boolean) => void;
+  onSaveChange: (save: CanvasSave | undefined) => void;
+}
+
+export function CollaborativeCanvas(props: CanvasProps) {
+  const { roomId } = props;
   return (
     <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
       <RoomProvider
@@ -92,7 +112,7 @@ export function CollaborativeCanvas({
               fallback={<CanvasMessage>Loading canvas…</CanvasMessage>}
             >
               <ReactFlowProvider>
-                <Canvas {...templatesModal} />
+                <Canvas {...props} />
               </ReactFlowProvider>
             </ClientSideSuspense>
           </ThrowOnConnectionError>
@@ -103,9 +123,11 @@ export function CollaborativeCanvas({
 }
 
 function Canvas({
+  roomId,
   isTemplatesOpen,
   onTemplatesOpenChange,
-}: TemplatesModalProps) {
+  onSaveChange,
+}: CanvasProps) {
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onDelete } =
     useLiveblocksFlow<CanvasNode, CanvasEdge>({
       suspense: true,
@@ -115,6 +137,47 @@ function Canvas({
   const { screenToFlowPosition, fitView } = useReactFlow();
   const updateMyPresence = useUpdateMyPresence();
   const selection = useSelectionBox();
+  const room = useRoom();
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  // React Flow keeps a fitView queued until it has nodes, so on an empty canvas the first
+  // drop would trigger it. Only fit on mount when the room already has nodes.
+  const [fitOnMount] = useState(nodes.length > 0);
+
+  function loadSaved(canvas: SavedCanvas) {
+    onNodesChange(canvas.nodes.map((item) => ({ type: "add", item })));
+    onEdgesChange(canvas.edges.map((item) => ({ type: "add", item })));
+    // Same queueing: fitting an empty saved canvas would fire on the first drop.
+    if (canvas.nodes.length) fitView();
+  }
+
+  // Delete/Backspace removes the selection through Liveblocks (React Flow's deleteKeyCode is off).
+  // On window, not the wrapper div: after a pane click or box selection nothing inside has focus.
+  const flowNodes = useNodes<CanvasNode>();
+  const flowEdges = useEdges<CanvasEdge>();
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Delete" && event.key !== "Backspace") return;
+      if (isEditable(event.target)) return;
+      const doomedNodes = flowNodes.filter((n) => n.selected);
+      const ids = new Set(doomedNodes.map((n) => n.id));
+      // Liveblocks' onDelete doesn't cascade, so include edges attached to deleted nodes.
+      const doomedEdges = flowEdges.filter(
+        (e) => e.selected || ids.has(e.source) || ids.has(e.target),
+      );
+      if (!doomedNodes.length && !doomedEdges.length) return;
+      event.preventDefault();
+      onDelete({ nodes: doomedNodes, edges: doomedEdges });
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [flowNodes, flowEdges, onDelete]);
+
+  // Room ID == project ID.
+  const { status, saveNow } = useCanvasAutosave(roomId, nodes, edges, loadSaved);
+  useEffect(() => {
+    onSaveChange({ status, saveNow });
+    return () => onSaveChange(undefined);
+  }, [status, saveNow, onSaveChange]);
 
   function onMouseMove(event: MouseEvent) {
     updateMyPresence({
@@ -122,32 +185,64 @@ function Canvas({
     });
   }
 
-  function importTemplate(template: CanvasTemplate) {
-    // Fresh IDs per import, so re-importing never collides with nodes still being removed.
+  function importTemplate(template: CanvasTemplate, mode: TemplateImportMode) {
+    // Fresh IDs per import, so importing the same template twice never collides.
     const suffix = Date.now().toString(36);
     const id = (base: string) => `${base}-${suffix}`;
-    // Clear first: the template replaces the canvas instead of landing on top of it.
-    onEdgesChange(edges.map((e) => ({ type: "remove", id: e.id })));
-    onNodesChange(nodes.map((n) => ({ type: "remove", id: n.id })));
-    onNodesChange(
-      template.nodes.map((n) => ({
-        type: "add",
-        item: { ...n, id: id(n.id) },
-      })),
-    );
-    onEdgesChange(
-      template.edges.map((e) => ({
-        type: "add",
-        item: {
-          ...e,
-          id: id(e.id),
-          source: id(e.source),
-          target: id(e.target),
-        },
-      })),
-    );
+
+    // "add": shift the template so its bounds are centered in the current view.
+    let dx = 0;
+    let dy = 0;
+    const rect = wrapperRef.current?.getBoundingClientRect();
+    if (mode === "add" && rect) {
+      const target = screenToFlowPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      });
+      const bounds = getNodesBounds(template.nodes);
+      dx = Math.round(target.x - (bounds.x + bounds.width / 2));
+      dy = Math.round(target.y - (bounds.y + bounds.height / 2));
+    }
+    const newNodes = template.nodes.map((n) => ({
+      ...n,
+      id: id(n.id),
+      position: { x: n.position.x + dx, y: n.position.y + dy },
+    }));
+    const newEdges = template.edges.map((e) => ({
+      ...e,
+      id: id(e.id),
+      source: id(e.source),
+      target: id(e.target),
+    }));
+
+    // One batch = one undo step. Liveblocks ignores "remove" changes, so clearing uses onDelete.
+    room.batch(() => {
+      if (mode === "replace") {
+        onDelete({ nodes, edges });
+      } else {
+        onNodesChange(
+          flowNodes
+            .filter((n) => n.selected)
+            .map((n) => ({ type: "select", id: n.id, selected: false })),
+        );
+        onEdgesChange(
+          flowEdges
+            .filter((e) => e.selected)
+            .map((e) => ({ type: "select", id: e.id, selected: false })),
+        );
+      }
+      onNodesChange(newNodes.map((item) => ({ type: "add", item })));
+      onEdgesChange(newEdges.map((item) => ({ type: "add", item })));
+      // Pre-select the import so it can be dragged as a group (selection is local to this user).
+      onNodesChange(
+        newNodes.map((n) => ({ type: "select", id: n.id, selected: true })),
+      );
+      onEdgesChange(
+        newEdges.map((e) => ({ type: "select", id: e.id, selected: true })),
+      );
+    });
     // React Flow queues this until the new nodes are measured.
-    fitView({ duration: 200 });
+    if (mode === "replace") fitView({ duration: 200 });
   }
 
   function onDragOver(event: DragEvent) {
@@ -185,6 +280,7 @@ function Canvas({
 
   return (
     <div
+      ref={wrapperRef}
       className="h-full w-full"
       onDragOver={onDragOver}
       onDrop={onDrop}
@@ -197,8 +293,8 @@ function Canvas({
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onDelete={onDelete}
-        // Removing a node also removes its connected edges (React Flow passes both to onDelete).
-        deleteKeyCode={["Delete", "Backspace"]}
+        // Keyboard deletion is handled above so it always goes through Liveblocks.
+        deleteKeyCode={null}
         onMouseMove={onMouseMove}
         onMouseLeave={() => updateMyPresence({ cursor: null })}
         nodeTypes={nodeTypes}
@@ -207,7 +303,7 @@ function Canvas({
         connectionMode={ConnectionMode.Loose}
         // Double-click edits node and edge labels. React Flow binds dblclick zoom directly on the pane, so nopan can't block it.
         zoomOnDoubleClick={false}
-        fitView
+        fitView={fitOnMount}
         colorMode="dark"
         // React Flow's dark mode paints #141414 over the page; keep the canvas flush with --bg-base.
         className="[--xy-background-color:var(--bg-base)]"
@@ -218,7 +314,7 @@ function Canvas({
           size={1.5}
           color="var(--border-subtle)"
         />
-        <ShapePanel />
+        <ShapePanel saveStatus={status} />
         <CanvasControls />
         <PresenceAvatars />
         <LiveCursors />

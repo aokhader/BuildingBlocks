@@ -1,9 +1,13 @@
 "use client";
 
-import { Plus, Sparkles } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 
-import { CollaborativeCanvas } from "@/components/editor/collaborative-canvas";
+import { AiSidebar } from "@/components/editor/ai-sidebar";
+import {
+  CollaborativeCanvas,
+  type CanvasSave,
+} from "@/components/editor/collaborative-canvas";
 import { EditorNavbar } from "@/components/editor/editor-navbar";
 import { ProjectDialogs } from "@/components/editor/project-dialogs";
 import { ProjectSidebar } from "@/components/editor/project-sidebar";
@@ -11,7 +15,6 @@ import { ShareDialog } from "@/components/editor/share-dialog";
 import { Button } from "@/components/ui/button";
 import { useProjectActions } from "@/hooks/use-project-actions";
 import type { ProjectSummary } from "@/lib/projects";
-import { cn } from "@/lib/utils";
 
 interface EditorShellProps {
   owned: ProjectSummary[];
@@ -25,6 +28,7 @@ export function EditorShell({ owned, shared, activeProject }: EditorShellProps) 
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
+  const [canvasSave, setCanvasSave] = useState<CanvasSave>();
   const actions = useProjectActions();
 
   return (
@@ -38,6 +42,7 @@ export function EditorShell({ owned, shared, activeProject }: EditorShellProps) 
           onToggleAiSidebar: () => setIsAiSidebarOpen((open) => !open),
           onShare: () => setIsShareOpen(true),
           onOpenTemplates: () => setIsTemplatesOpen(true),
+          onSave: canvasSave?.saveNow,
         })}
       />
       <ProjectSidebar
@@ -59,21 +64,10 @@ export function EditorShell({ owned, shared, activeProject }: EditorShellProps) 
               roomId={activeProject.id}
               isTemplatesOpen={isTemplatesOpen}
               onTemplatesOpenChange={setIsTemplatesOpen}
+              onSaveChange={setCanvasSave}
             />
           </main>
-          <aside
-            aria-label="AI assistant"
-            inert={!isAiSidebarOpen}
-            className={cn(
-              "fixed top-14 right-0 bottom-0 z-40 flex w-80 flex-col items-center justify-center gap-3 border-l border-surface-border bg-surface/90 px-6 text-center backdrop-blur-md transition-[translate,visibility,box-shadow] duration-200",
-              isAiSidebarOpen
-                ? "translate-x-0 shadow-2xl shadow-black/50"
-                : "invisible translate-x-full"
-            )}
-          >
-            <Sparkles className="h-8 w-8 text-ai-text" />
-            <p className="text-sm text-copy-muted">AI chat coming soon</p>
-          </aside>
+          <AiSidebar isOpen={isAiSidebarOpen} onClose={() => setIsAiSidebarOpen(false)} />
           <ShareDialog
             key={activeProject.id}
             projectId={activeProject.id}
