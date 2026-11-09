@@ -8,7 +8,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Feature 03: auth (`context/feature-specs/03-auth.md`) — done
+- Feature 04: project dialogs (`context/feature-specs/04-project-dialogs.md`) — done
 
 ## Completed
 
@@ -25,6 +25,13 @@ Update this file whenever the current phase, active feature, or implementation s
   - [x] `/` redirects to `/editor` (signed in) or the sign-in URL (signed out)
   - [x] `app/editor/page.tsx` mounts `EditorNavbar` + `ProjectSidebar`; `UserButton` in navbar right section
   - [x] `npm run build`, typecheck, lint clean; verified `/` and `/editor` redirect to sign-in when signed out
+- 04 Project dialogs:
+  - [x] `/editor` home: centered heading, description, `New Project` (`Plus`) button opens Create dialog
+  - [x] `components/editor/project-dialogs.tsx` — Create (name + live slug preview), Rename (prefilled, current name in description, autofocus, Enter submits), Delete (confirm only, destructive button)
+  - [x] `hooks/use-project-dialogs.ts` — dialog, form, and loading state; local mock mutations with simulated latency
+  - [x] Sidebar lists mock projects; rename/delete actions only on owned projects; sidebar `New Project` opens Create; mobile scrim closes sidebar on tap outside
+  - [x] `lib/slug.ts` `toSlug()`, `lib/mock-projects.ts` mock data
+  - [x] `npm run build`, typecheck, lint clean
 
 ## In Progress
 
@@ -32,7 +39,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Next feature spec (projects / canvas).
+- Next feature spec after 04 (persistence / canvas).
 
 ## Open Questions
 
@@ -46,6 +53,14 @@ Update this file whenever the current phase, active feature, or implementation s
 - Route protection is protect-by-default in `proxy.ts` (`clerkMiddleware` + `auth.protect()` with a manual public-path check; deprecated `createRouteMatcher` avoided). API routes / Server Functions still call `auth.protect()` themselves.
 - Editor route is `/editor`; the client page owns `isSidebarOpen`.
 - Dialogs wrap `components/ui/dialog` via `EditorDialog` with token classes; shadcn primitives stay unmodified.
+- Client hooks live in `hooks/`. Project dialogs are one `EditorDialog` driven by `useProjectDialogs`; the hook keeps the last dialog after close so content doesn't vanish mid-animation.
+- Project data is mock (`lib/mock-projects.ts`) held in hook state; no persistence until a later spec.
+- The `bg-base` token is declared as `--background-color-base`, not `--color-base`: a `--color-*` token named `base` also emits a color for `text-base`, which turned all `text-base` text (e.g. shadcn `Input`) near-black. Avoid `--color-*` token names that collide with Tailwind size keywords (`base`, `sm`, `lg`, `xs`, ...).
+
+## Fixed Issues
+
+- Dialog input text was black: `text-base` color collision (above). Fixed in `globals.css`.
+- Rename dialog now shows the slug preview, with the old slug struck through when the new name changes it.
 
 ## Session Notes
 
