@@ -131,7 +131,7 @@ export function CanvasNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
           }
           onBlur={() => setIsEditing(false)}
           onKeyDown={(e) => {
-            if (e.key === "Escape") e.currentTarget.blur();
+            if (e.key === "Enter" || e.key === "Escape") e.currentTarget.blur();
           }}
           aria-label="Node label"
           className="nodrag nopan nowheel col-start-1 row-start-1 h-full min-w-0 resize-none overflow-hidden border-0 bg-transparent p-0 text-center [font:inherit] text-inherit outline-none placeholder:text-copy-faint"
