@@ -37,6 +37,7 @@ import { LiveCursors, PresenceAvatars } from "@/components/editor/presence";
 import { ShapePanel } from "@/components/editor/shape-panel";
 import type { CanvasTemplate } from "@/components/editor/starter-templates";
 import { StarterTemplatesModal } from "@/components/editor/starter-templates-modal";
+import { useSelectionBox } from "@/hooks/use-selection-box";
 import {
   DEFAULT_NODE_COLOR,
   DEFAULT_NODE_TEXT_COLOR,
@@ -101,7 +102,10 @@ export function CollaborativeCanvas({
   );
 }
 
-function Canvas({ isTemplatesOpen, onTemplatesOpenChange }: TemplatesModalProps) {
+function Canvas({
+  isTemplatesOpen,
+  onTemplatesOpenChange,
+}: TemplatesModalProps) {
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onDelete } =
     useLiveblocksFlow<CanvasNode, CanvasEdge>({
       suspense: true,
@@ -110,6 +114,7 @@ function Canvas({ isTemplatesOpen, onTemplatesOpenChange }: TemplatesModalProps)
     });
   const { screenToFlowPosition, fitView } = useReactFlow();
   const updateMyPresence = useUpdateMyPresence();
+  const selection = useSelectionBox();
 
   function onMouseMove(event: MouseEvent) {
     updateMyPresence({
@@ -125,12 +130,20 @@ function Canvas({ isTemplatesOpen, onTemplatesOpenChange }: TemplatesModalProps)
     onEdgesChange(edges.map((e) => ({ type: "remove", id: e.id })));
     onNodesChange(nodes.map((n) => ({ type: "remove", id: n.id })));
     onNodesChange(
-      template.nodes.map((n) => ({ type: "add", item: { ...n, id: id(n.id) } })),
+      template.nodes.map((n) => ({
+        type: "add",
+        item: { ...n, id: id(n.id) },
+      })),
     );
     onEdgesChange(
       template.edges.map((e) => ({
         type: "add",
-        item: { ...e, id: id(e.id), source: id(e.source), target: id(e.target) },
+        item: {
+          ...e,
+          id: id(e.id),
+          source: id(e.source),
+          target: id(e.target),
+        },
       })),
     );
     // React Flow queues this until the new nodes are measured.
@@ -171,7 +184,12 @@ function Canvas({ isTemplatesOpen, onTemplatesOpenChange }: TemplatesModalProps)
   }
 
   return (
-    <div className="h-full w-full" onDragOver={onDragOver} onDrop={onDrop}>
+    <div
+      className="h-full w-full"
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      {...selection.handlers}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -179,23 +197,44 @@ function Canvas({ isTemplatesOpen, onTemplatesOpenChange }: TemplatesModalProps)
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onDelete={onDelete}
+        // Removing a node also removes its connected edges (React Flow passes both to onDelete).
+        deleteKeyCode={["Delete", "Backspace"]}
         onMouseMove={onMouseMove}
         onMouseLeave={() => updateMyPresence({ cursor: null })}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
         connectionMode={ConnectionMode.Loose}
+        // Double-click edits node and edge labels. React Flow binds dblclick zoom directly on the pane, so nopan can't block it.
+        zoomOnDoubleClick={false}
         fitView
         colorMode="dark"
         // React Flow's dark mode paints #141414 over the page; keep the canvas flush with --bg-base.
         className="[--xy-background-color:var(--bg-base)]"
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} color="var(--border-subtle)" />
+        <Background
+          variant={BackgroundVariant.Dots}
+          gap={20}
+          size={1.5}
+          color="var(--border-subtle)"
+        />
         <ShapePanel />
         <CanvasControls />
         <PresenceAvatars />
         <LiveCursors />
       </ReactFlow>
+      {selection.box && (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed z-50 border border-[#0078d7] bg-[#0078d7]/15"
+          style={{
+            left: Math.min(selection.box.x0, selection.box.x1),
+            top: Math.min(selection.box.y0, selection.box.y1),
+            width: Math.abs(selection.box.x1 - selection.box.x0),
+            height: Math.abs(selection.box.y1 - selection.box.y0),
+          }}
+        />
+      )}
       <StarterTemplatesModal
         open={isTemplatesOpen}
         onOpenChange={onTemplatesOpenChange}

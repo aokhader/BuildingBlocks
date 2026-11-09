@@ -8,7 +8,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Feature 19: Presence avatars and live cursors (`context/feature-specs/19-presence-avatar-cursor.md`) — done
+- Feature 14 (revised): Node editing — deletion and multi-selection added (`context/feature-specs/14-node-editing.md`) — done
 
 ## Completed
 
@@ -94,6 +94,9 @@ Update this file whenever the current phase, active feature, or implementation s
   - [x] `CanvasNode` renders React Flow `NodeResizer` while selected: 7px dark handles with cyan border, faint cyan outline, min 40x40. Resize emits `dimensions`/`position` changes through the existing `onNodesChange`, synced by Liveblocks
   - [x] Inline label: double-click anywhere on the node (a `nopan` wrapper around `ShapeView`) opens a `textarea` overlaid on a hidden copy of the text in one CSS grid cell (box sizes from the text, no layout shift); `Label` placeholder in `text-copy-faint` when empty. Typing calls `updateNodeData` (a `replace` change, synced by Liveblocks); blur or `Escape` closes. Textarea has `nodrag nopan nowheel`
   - [x] `ShapeView` `label` prop widened to `ReactNode`; shape rendering, shape panel, drag ghost and node creation unchanged
+  - [x] Deletion (spec item 4, added later): `deleteKeyCode={["Delete", "Backspace"]}` (Backspace was the existing default). React Flow passes the selected nodes plus their connected edges to Liveblocks `onDelete`, one mutation = one undo step
+  - [x] Multi-select (spec item 5): `hooks/use-selection-box.ts` — right-drag on the pane draws a fixed-position Windows-blue box (`#0078d7`); live-selects nodes it touches (`getIntersectingNodes`, partial) and edges whose rendered path crosses it (24 sampled points per path in screen space) plus edges between two selected nodes; applied as `select` changes. Browser context menu suppressed on the pane. React Flow's built-in box is left-button only, which pans here
+  - [x] Selection as a unit: dragging moves all selected (React Flow default, one paused-history batch); resizing one selected node maps the others through the same scale (position relative to the resized node's start rect, size x scale, min 40) via `triggerNodeChanges` with `resizing: true`, so the whole group resize is one undo step; Delete removes all selected and their edges
   - [x] `npm run build`, lint clean
 - 15 Node color toolbar:
   - [x] `types/canvas.ts` `NODE_COLORS` — 8 `{ name, fill, text }` pairs from `ui-context.md` (not in `globals.css`); `DEFAULT_NODE_COLOR`/`DEFAULT_NODE_TEXT_COLOR` are the first pair. `CanvasNodeData.textColor` is optional (older nodes fall back to the default text color); new nodes store both
@@ -166,7 +169,9 @@ Update this file whenever the current phase, active feature, or implementation s
 - Canvas looked like a floating card: React Flow's `colorMode="dark"` paints `#141414` over the page. `ReactFlow` now sets `--xy-background-color: var(--bg-base)`, dots use `--border-subtle`, and the minimap uses project tokens.
 - Dropped shapes all rendered as the same rounded rectangle, so drag-and-drop looked broken (the pipeline itself was correct). `canvas-node.tsx` now renders each shape: CSS radius for rectangle/circle/pill, inline SVG for diamond/hexagon/cylinder.
 - Sidebars get an elevation shadow only while open and become `invisible` when closed (visibility transitions with the slide), so nothing peeks past the viewport edge.
+- Double-clicking an edge (or node) to edit its label also zoomed the canvas: React Flow binds `dblclick.zoom` directly on the pane, bypassing its filter, so `nopan` doesn't stop it. `ReactFlow` now sets `zoomOnDoubleClick={false}` (empty-canvas double-click no longer zooms either).
 - Label text jumped up a line while editing: the textarea's default `rows=2` made the grid cell a line taller than the text. Now `rows={1}` + `h-full`.
+- Right-drag selection flashed every node selected at the start: while the box was still a line (0 width or height), `getIntersectingNodes` matched all nodes (`overlap >= box area` with area 0). `use-selection-box` now skips selection until the box has both width and height.
 
 ## Session Notes
 

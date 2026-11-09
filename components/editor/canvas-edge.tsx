@@ -65,7 +65,6 @@ export function CanvasEdge({
 
   return (
     <>
-      {/* nopan stops a double-click on the edge from zooming the canvas. */}
       <g className="nopan" onDoubleClick={startEditing} {...hover}>
         <BaseEdge
           path={path}

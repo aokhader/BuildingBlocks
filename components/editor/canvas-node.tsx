@@ -7,9 +7,12 @@ import {
   Position,
   useConnection,
   useReactFlow,
+  useStoreApi,
+  type NodeChange,
   type NodeProps,
+  type ResizeParams,
 } from "@xyflow/react";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 import {
   DEFAULT_NODE_TEXT_COLOR,
@@ -101,6 +104,68 @@ export function CanvasNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
     (c) => c.inProgress && c.toNode?.id === id,
   );
   const showHandles = selected || isHovered || isConnectionTarget;
+  const store = useStoreApi<CanvasNodeType>();
+  // Start rects of this node and the other selected nodes, for group scaling.
+  const resizeStart = useRef<{
+    self: ResizeParams;
+    others: { id: string; x: number; y: number; w: number; h: number }[];
+  } | null>(null);
+
+  function onResizeStart(_: unknown, params: ResizeParams) {
+    const others = store
+      .getState()
+      .nodes.filter((n) => n.selected && n.id !== id)
+      .map((n) => ({
+        id: n.id,
+        x: n.position.x,
+        y: n.position.y,
+        w: n.width ?? n.measured?.width ?? 0,
+        h: n.height ?? n.measured?.height ?? 0,
+      }));
+    resizeStart.current = { self: params, others };
+  }
+
+  // Map the other selected nodes through the same scale as this node's rect, so the
+  // group scales as one. resizing:true pauses history, so the whole resize is one undo step.
+  function onResize(_: unknown, params: ResizeParams) {
+    const start = resizeStart.current;
+    if (!start?.others.length) return;
+    const sx = params.width / start.self.width;
+    const sy = params.height / start.self.height;
+    store.getState().triggerNodeChanges(
+      start.others.flatMap((n): NodeChange<CanvasNodeType>[] => [
+        {
+          id: n.id,
+          type: "dimensions",
+          resizing: true,
+          setAttributes: true,
+          dimensions: {
+            width: Math.max(MIN_NODE_SIZE, n.w * sx),
+            height: Math.max(MIN_NODE_SIZE, n.h * sy),
+          },
+        },
+        {
+          id: n.id,
+          type: "position",
+          position: {
+            x: params.x + (n.x - start.self.x) * sx,
+            y: params.y + (n.y - start.self.y) * sy,
+          },
+        },
+      ]),
+    );
+  }
+
+  function onResizeEnd() {
+    const others = resizeStart.current?.others ?? [];
+    resizeStart.current = null;
+    if (!others.length) return;
+    store
+      .getState()
+      .triggerNodeChanges(
+        others.map((n) => ({ id: n.id, type: "dimensions", resizing: false })),
+      );
+  }
   const text = data.label || LABEL_PLACEHOLDER;
 
   // Textarea overlays a hidden copy of the text in one grid cell, so the box
@@ -178,6 +243,9 @@ export function CanvasNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
         isVisible={selected}
         minWidth={MIN_NODE_SIZE}
         minHeight={MIN_NODE_SIZE}
+        onResizeStart={onResizeStart}
+        onResize={onResize}
+        onResizeEnd={onResizeEnd}
         color="var(--accent-primary)"
         lineStyle={{ borderColor: "var(--accent-primary)", opacity: 0.4 }}
         handleStyle={{
@@ -188,7 +256,7 @@ export function CanvasNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
           borderColor: "var(--accent-primary)",
         }}
       />
-      {/* Double-click anywhere on the node edits its label; nopan stops the canvas zooming. */}
+      {/* Double-click anywhere on the node edits its label. */}
       <div
         className="nopan h-full w-full"
         onDoubleClick={() => setIsEditing(true)}
