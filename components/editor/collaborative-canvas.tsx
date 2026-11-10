@@ -98,7 +98,11 @@ interface CanvasProps {
   onSaveChange: (save: CanvasSave | undefined) => void;
 }
 
-export function CollaborativeCanvas(props: CanvasProps) {
+// `children` share the room but sit outside the canvas suspense/error boundary (e.g. the AI sidebar).
+export function CollaborativeCanvas({
+  children,
+  ...props
+}: CanvasProps & { children?: ReactNode }) {
   const { roomId } = props;
   return (
     <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
@@ -117,6 +121,7 @@ export function CollaborativeCanvas(props: CanvasProps) {
             </ClientSideSuspense>
           </ThrowOnConnectionError>
         </CanvasErrorBoundary>
+        {children}
       </RoomProvider>
     </LiveblocksProvider>
   );

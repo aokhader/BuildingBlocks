@@ -3,6 +3,7 @@
 import { UserButton, useAuth } from "@clerk/nextjs";
 import { useOthers } from "@liveblocks/react/suspense";
 import { Panel, useViewport } from "@xyflow/react";
+import { LoaderCircle } from "lucide-react";
 
 const MAX_AVATARS = 5;
 const AVATAR = "size-7 shrink-0 rounded-full ring-2 ring-[var(--bg-base)]";
@@ -86,10 +87,13 @@ export function LiveCursors() {
               <path d="M1 1 L15 7 L8 8.5 L5.5 15 Z" fill={info.color} stroke="white" strokeWidth="1" />
             </svg>
             <span
-              className="ml-3 block rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap text-white"
+              className="ml-3 flex w-max items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap text-white"
               style={{ backgroundColor: info.color }}
             >
               {info.name}
+              {presence.thinking && (
+                <LoaderCircle className="size-3 animate-spin" aria-label="thinking" />
+              )}
             </span>
           </div>
         ) : null,

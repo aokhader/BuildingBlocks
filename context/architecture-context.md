@@ -52,12 +52,14 @@
 - Input: user prompt, project context, and current canvas state.
 - Execution: durable background task via Trigger.dev.
 - Output: structured node and edge updates written into the shared Liveblocks room.
+- Progress: the task sets AI presence (`buildingblocks-ai`: cursor + `thinking`) and posts status messages (`AiStatusMessage`, `types/tasks.ts`) to the room's Liveblocks Feed `ai-status-feed`. The AI sidebar derives "AI is working" from presence `thinking` and shows only the latest validated feed message.
+- Room chat: the AI sidebar reads and writes the separate Liveblocks Feed `ai-chat` (`AiChatMessage` `{ sender, role, content, timestamp }`, Zod-validated in `types/tasks.ts` before rendering). Chat and status feeds are never mixed.
 
 ### Spec Generation
 
 - Input: current canvas graph and project context.
 - Execution: durable background task via Trigger.dev.
-- Output: Markdown technical spec saved to the filesystem and linked to the project in the database.
+- Output: Markdown technical spec uploaded by the task to Vercel Blob (`specs/{projectId}/{specId}.md`, spec ID = run ID) with a `ProjectSpec` row (`filePath` = blob URL). Downloaded only through `GET /api/projects/[projectId]/specs/[specId]/download`, which checks project access and streams the private blob. `GET /api/projects/[projectId]/specs` lists metadata (`id`, `createdAt`) only.
 
 ## Invariants
 

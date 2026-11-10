@@ -1,0 +1,11 @@
+// Trigger.dev runs started by a user, so run-scoped tokens go only to the run's owner.
+model TaskRun {
+  id        String   @id @default(cuid())
+  runId     String   @unique
+  projectId String
+  userId    String // Clerk user ID
+  createdAt DateTime @default(now())
+
+  @@index([runId])
+  @@index([userId, projectId])
+}

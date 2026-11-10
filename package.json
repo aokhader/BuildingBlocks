@@ -10,6 +10,7 @@
     "postinstall": "prisma skills sync || exit 0"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.114",
     "@clerk/nextjs": "^7.9.15",
     "@clerk/ui": "^1.40.1",
     "@liveblocks/client": "^3.25.0",
@@ -19,8 +20,11 @@
     "@liveblocks/react-ui": "^3.25.0",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
+    "@trigger.dev/react-hooks": "4.8.3",
+    "@trigger.dev/sdk": "4.8.3",
     "@vercel/blob": "^2.8.2",
     "@xyflow/react": "^12.12.1",
+    "ai": "^7.0.166",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
     "dotenv": "^18.0.10",
@@ -29,10 +33,14 @@
     "pg": "^8.23.1",
     "radix-ui": "^1.8.1",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@trigger.dev/build": "4.8.3",
     "@types/node": "^20",
     "@types/pg": "^8.23.1",
     "@types/react": "^19",

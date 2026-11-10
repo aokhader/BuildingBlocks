@@ -65,9 +65,11 @@ export function EditorShell({ owned, shared, activeProject }: EditorShellProps) 
               isTemplatesOpen={isTemplatesOpen}
               onTemplatesOpenChange={setIsTemplatesOpen}
               onSaveChange={setCanvasSave}
-            />
+            >
+              {/* Inside the room so it can read AI presence and the status feed; it is `fixed`, so DOM position doesn't matter. */}
+              <AiSidebar isOpen={isAiSidebarOpen} onClose={() => setIsAiSidebarOpen(false)} />
+            </CollaborativeCanvas>
           </main>
-          <AiSidebar isOpen={isAiSidebarOpen} onClose={() => setIsAiSidebarOpen(false)} />
           <ShareDialog
             key={activeProject.id}
             projectId={activeProject.id}

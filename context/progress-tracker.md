@@ -8,7 +8,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Feature 21: Canvas autosave (`context/feature-specs/21-canvas-autosave.md`) — done
+- Feature 29: Spec UI integration (`context/feature-specs/29-spec-ui-integration.md`) — done
 
 ## Completed
 
@@ -151,15 +151,81 @@ Update this file whenever the current phase, active feature, or implementation s
   - [x] Navbar Save button (workspace only) reflects manual saves only; autosave runs silently in the background. `Save` (`Save` icon) by default, `Saving...` (spinning `LoaderCircle`) while the click's request is in flight, then `Saved` (`Check`) or `Error` (`CircleAlert`, `text-error`) for 2s before returning to `Save` (`useManualSave` in `editor-navbar.tsx`). `saveNow` returns `Promise<boolean>`; it resolves `false` before the saved canvas has loaded. `Canvas` reports `{ status, saveNow }` up to `EditorShell` via `onSaveChange`
   - [x] `npm run build`, lint clean; Blob put/overwrite/uncached get verified against the real store
 
+- Trigger.dev setup:
+  - [x] `@trigger.dev/sdk` + `@trigger.dev/build` 4.8.3; `trigger.config.ts` (project `proj_egbbpkhmqnceuhzwxhie`, `node-24`) with `dirs: ["./trigger"]` (root, per architecture boundaries); `.trigger` gitignored
+  - [x] `trigger/example.ts` `hello-world` placeholder task; app code triggers via `import type` + `tasks.trigger<typeof t>("id", payload)`
+  - [x] `TRIGGER_SECRET_KEY` in `.env.local` (dev key from the dashboard); run `npx trigger.dev@4.8.3 dev` alongside `npm run dev`
+
+- 22 Design agent API (backend wiring only, no AI, no UI):
+  - [x] `prisma/models/task-run.prisma` `TaskRun` (`runId` unique, `projectId`, `userId` = Clerk user ID, `createdAt`; index on `runId`, compound index on `userId`+`projectId`); migration `20261110020012_task_run`. No relation to `Project`
+  - [x] `trigger/design-agent.ts` — `design-agent` task, payload `{ prompt, roomId }`, logs and returns its input
+  - [x] `POST /api/ai/design` `{ prompt, roomId, projectId }` — `401` signed out, `400` missing fields or `roomId !== projectId` (room ID == project ID), `404` no project access; triggers via `tasks.trigger<typeof designAgent>` (type-only import), stores a `TaskRun`, returns `{ runId }`
+  - [x] `POST /api/ai/design/token` `{ runId }` — `401`/`400`; `404` unless a `TaskRun` with that `runId` belongs to the caller; returns `{ token }` from `auth.createPublicToken` scoped to read that run
+  - [x] `npm run build`, lint clean. Not exercised end to end against a running `trigger.dev dev` worker
+
+- 23 Design agent logic:
+  - [x] `trigger/design-agent.ts` — Gemini (`@ai-sdk/google` `gemini-3.5-flash`, key from `GEMINI_API_KEY` via `createGoogleGenerativeAI`) gets the current canvas (nodes with label/shape/color name/position/size, edges) and the prompt, and returns `{ summary, actions[] }` via `generateText` + `Output.object` with a `jsonSchema` (flat action object; zod is not a direct dependency). The system prompt carries the allowed shapes (role + default size), the `NODE_COLORS` names by role, and layout rules (grid, ≥80px horizontal / ≥60px vertical gaps, no overlap, aligned tiers, side handles by flow direction)
+  - [x] Actions: `addNode`, `moveNode`, `resizeNode`, `updateNode` (label/shape/color), `deleteNode` (also removes its edges), `addEdge`, `deleteEdge`. Applied one per `mutateFlow` call (`@liveblocks/react-flow/node`, existing `getLiveblocks()` client), so collaborators see the design build up. Every action is validated: unknown IDs, missing coordinates, and self-edges are skipped and counted. Shape falls back to rectangle and color to Neutral; sizes are clamped to 40–800. New nodes match user-created ones (`canvasNode`, shape-panel default size, fill + text color); edges match `defaultEdgeOptions` (duplicated in the task because the source modules are client components). Model IDs for new nodes map to `ai-<stamp>-<id>`
+  - [x] AI presence via `liveblocks.setPresence` (user `buildingblocks-ai`, "BuildingBlocks AI", `--accent-ai` color): `{ cursor, thinking: true }`, starting at the canvas center and then following each change. In `finally`, presence is reset to `{ cursor: null, thinking: false }` with the minimum 2s TTL (there is no delete API). `LiveCursors` badge now appends "· thinking…" while a participant's `thinking` is true
+  - [x] Status feed: Liveblocks Feed `ai-status` (`AI_STATUS_FEED_ID`, created on first run), messages `{ runId, status: start|processing|complete|error, message }` at start, "Planning the design…", "Applying N changes…", then the summary (plus the skipped count) or an error. Feed and presence writes are best-effort (logged, never fail the run)
+  - [x] Errors: posts the `error` status, clears presence, and rethrows so the run shows as failed. `retry: { maxAttempts: 1 }` because the edits are not idempotent. `maxDuration: 300`
+  - [x] `npm run build`, typecheck, lint clean. Not run end to end (needs a `trigger.dev dev` worker and a real Gemini call)
+
+- 24 AI presence state (UI + realtime signals only, no generation flow):
+  - [x] `types/tasks.ts` — `AI_STATUS_FEED_ID = "ai-status-feed"` (renamed from feature 23's `ai-status`), `AiStatusMessage` `{ text?, status?: start|processing|complete|error, runId? }`, `parseAiStatusMessage(data)` validates feed data (returns `null` for anything else). `trigger/design-agent.ts` imports both and now posts `{ runId, status, text }` (was `message`)
+  - [x] `CollaborativeCanvas` takes `children`, rendered inside `RoomProvider` but outside the canvas suspense/error boundary; `EditorShell` passes `AiSidebar` there so it can use room hooks (it is `fixed`, so layout is unchanged)
+  - [x] `AiSidebar` `useAiStatus()` (non-suspense `@liveblocks/react` hooks, so the sidebar works while the room connects): active = any other participant has `thinking: true` in presence (the AI agent joins as a participant; no parallel state); text = latest `useFeedMessages(AI_STATUS_FEED_ID)` message, validated. Status row above the input (`role="status"`, `aria-live`): spinning `LoaderCircle` while active, `Sparkles` otherwise; shows only the latest text (fallback "AI is working…"). While active the textarea is disabled and the send button shows a spinner and is disabled; tabs, chat history, starter chips, and close stay usable
+  - [x] `LiveCursors` badge shows a small spinning `LoaderCircle` while a participant's `thinking` is true (replaces the "· thinking…" text)
+  - [x] `npm run build`, lint clean; validator assert-checked. Not exercised against a live AI run
+
+- 25 Sidebar chat feed (room chat only; no AI replies, no backend tasks):
+  - [x] `types/tasks.ts` — `AI_CHAT_FEED_ID = "ai-chat"`, Zod `aiChatMessageSchema` `{ sender, role: user|assistant, content, timestamp (epoch ms) }`, `AiChatMessage`. `zod` added as a direct dependency (was already installed transitively)
+  - [x] `AiSidebar` `useRoomChat()`: `useFeedMessages(AI_CHAT_FEED_ID)` rendered in feed order, each message `safeParse`d and dropped if invalid; shows sender, time, and content (bubble styling unchanged, by role). Separate from `ai-status-feed`
+  - [x] Sending via the existing textarea/send button: `useCreateFeed` once per session (existing feed is fine, mirrors the design task), then `useCreateFeedMessage` with the user's `info.name`. Input clears only after a successful send; failure shows a small `role="alert"` error above the input. Send disabled while a send is in flight
+
+- 26 Design agent frontend (sidebar wiring only; no backend changes):
+  - [x] Submit: posts the user message to `ai-chat`, then `POST /api/ai/design` `{ prompt, roomId, projectId }` (`projectId` = room ID, which the existing route requires), then `POST /api/ai/design/token` for the public token (the existing API returns `{ runId }` and the token separately, not `{ runId, publicToken }`). `runId` + token held in local state
+  - [x] `useRealtimeRun<typeof designAgent>` (type-only import) with the token. On completion the submitter's client posts an `assistant` message ("BuildingBlocks AI") to `ai-chat`: the run's status-feed summary when it has arrived, else an applied-count fallback; failures and subscription errors post an error message. Start failures post "Couldn't start the design: …" to `ai-chat`
+  - [x] Busy = sending, local run active, or any participant `thinking` (covers other clients). Textarea disabled and send button shows a spinner while busy
+  - [x] Status strip (latest `ai-status-feed` text) shows only while a run is active; dark `bg-elevated` with green `#62C073` left border and spinner. No longer shows stale text after a run
+  - [x] User bubbles green `#62C073` with `#0F2E18` text (the Green node color pair from `types/canvas.ts`); AI bubbles `bg-elevated` + `text-copy-primary`; send button green, dimmed when disabled
+  - [x] Canvas changes come only through Liveblocks (`useLiveblocksFlow`); no manual sync
+  - [x] `npm run build`, typecheck, lint clean. Not exercised end to end (needs a `trigger.dev dev` worker and Gemini key)
+
+- 27 Spec generation flow (backend only; no frontend, no spec storage):
+  - [x] `types/tasks.ts` — Zod `specRequestSchema` `{ roomId, chatHistory: AiChatMessage[], nodes, edges }` (nodes/edges are loose React Flow JSON; only `id`, `data.label`/`shape`, `source`/`target` are typed) and `generateSpecPayloadSchema` (adds `projectId`)
+  - [x] `POST /api/ai/spec` — Clerk auth, Zod-validated body, project access from `roomId` (room ID == project ID; no client `projectId` accepted), triggers `generate-spec`, saves a `TaskRun`, returns `{ runId }`
+  - [x] `POST /api/ai/spec/token` — run-owner check via `TaskRun`, returns `{ token }` (public token scoped to the run, `expirationTime: "1h"`)
+  - [x] `trigger/generate-spec.ts` — `schemaTask` `generate-spec`, Gemini (`gemini-3.5-flash`, same key lookup as the design agent), metadata `status` processing/complete/error, returns `{ content }` (Markdown). Uses the config's default retries (read-only, safe to retry)
+  - [x] `npm run build`, typecheck, lint clean. Not run against a live Trigger.dev worker
+- 28 Spec persistence and download (backend only; no UI):
+  - [x] `prisma/models/project-spec.prisma` — `ProjectSpec` (`id`, `projectId` relation with cascade delete, `filePath` = Blob URL, `createdAt`; index on projectId+createdAt). Migration `20261110044126_project_spec` applied. Metadata only; content lives in Blob
+  - [x] `trigger/generate-spec.ts` — after generation, `put`s the Markdown to the private store at `specs/{projectId}/{specId}.md` and upserts the `ProjectSpec` row with the blob URL. `specId` = Trigger run ID, so a retry overwrites the same blob/record instead of duplicating. Returns `{ content, specId }`; metadata gets `specId`
+  - [x] `GET /api/projects/[projectId]/specs/[specId]/download` — `401` signed out, `404` missing project / no access (same as other project routes), `404` spec missing or not in that project, `404` blob missing. Streams the private blob as `text/markdown` with `Content-Disposition: attachment` (`{projectId}-spec.md`); the Blob URL is never returned
+  - [x] `npm run build`, typecheck, lint clean. Not run against a live Trigger.dev worker or with a real download
+- 29 Spec UI integration (sidebar Specs tab):
+  - [x] `GET /api/projects/[projectId]/specs` — added because no list endpoint existed (spec assumed one). `401` signed out, `404` no access; returns `{ specs: [{ id, createdAt }] }` newest first; `filePath` never returned
+  - [x] `AiSidebar` `SpecsTab`: fetches the list on tab open (inactive tab content unmounts, so it refetches each time); compact clickable rows with filename (`{projectId}-spec.md`, same as the download route; `ProjectSpec` has no filename column) and `createdAt`; loading, empty, and error states. Each row has a download link to the download route (`<a download>`, browser handles the file)
+  - [x] `SpecPreviewDialog` (`EditorDialog` + `ScrollArea`): fetches content through the download route on open, held only while open; rendered with `react-markdown` + `remark-gfm` (new deps; no raw HTML rendered). Close button, Esc, and focus trap from Radix; Download button in the footer
+  - [x] "Generate Spec" wired (follow-up fix: the button had no handler, so nothing ever triggered `generate-spec`): reads nodes/edges from the autosaved canvas (`GET /api/projects/[projectId]/canvas`; the sidebar is outside `ReactFlowProvider`) and chat history from the `ai-chat` feed, `POST /api/ai/spec` then `/api/ai/spec/token`, tracks the run with `useRealtimeRun<typeof generateSpec>`; button spins while running, errors show under it, list refetches on success
+  - [x] `npm run build`, typecheck, lint clean. Not exercised with real specs in a browser
+
 ## In Progress
 
 - None.
 
 ## Next Up
 
+- Spec generation reads the autosaved canvas, so edits from the last ~1.5s before clicking may be missing. Switching away from the Specs tab mid-run drops tracking (the spec still saves and shows on reopen).
+- Dev: after `prisma generate` adds a model, restart `next dev`; `lib/prisma.ts` caches the old client on `global` (`prisma.projectSpec` was undefined until restart).
+- The closing AI message is posted by the submitter's client; if they close the tab mid-run, no closing message is posted (the status feed still shows the summary).
+- The feed is created by the design task on its first run; until then `useFeedMessages` has nothing (or an error) and the status row stays hidden. 
+- The Trigger.dev environment needs `GEMINI_API_KEY`, `LIVEBLOCKS_SECRET_KEY`, and (for spec saving) `DATABASE_URL` and `BLOB_READ_WRITE_TOKEN` (dev reads the local env files; deployed runs need them set in the Trigger.dev dashboard).
+- Each AI action is a separate storage mutation, so a large plan means many Liveblocks REST calls. Batch them if latency or rate limits become a problem.
+
 - In the workspace view the navbar still shows its own `UserButton` (spec: navbar unchanged), so the current user's button appears twice there.
 - AI sidebar textarea auto-resize relies on CSS `field-sizing`, unsupported in Firefox/Safari (fixed 104px there).
-- Autosave: edits made in the last 1.5s before closing the tab are not flushed to Blob (the Liveblocks room still has them). Deleting a project does not delete its canvas blob.
+- Autosave: edits made in the last 1.5s before closing the tab are not flushed to Blob (the Liveblocks room still has them). Deleting a project does not delete its canvas or spec blobs (spec rows cascade).
 - Loading a saved canvas into an empty room is one Liveblocks change per list, so it is undoable.
 - Starter template import is several Liveblocks changes, so undo may revert it in steps rather than all at once.
 
@@ -198,6 +264,8 @@ Update this file whenever the current phase, active feature, or implementation s
 - Template import never cleared the canvas (Liveblocks ignores `remove` changes). The templates modal now offers "Add to canvas" (template bounds centered in the current view via `getNodesBounds` + `screenToFlowPosition`, viewport unchanged) or "Replace canvas" (`onDelete` on everything, then `fitView`). Both run in one `room.batch` (one undo step) and pre-select the imported nodes and edges (local `select` changes), deselecting anything previously selected.
 - Autosave status indicator above the shape panel (`ShapePanel` `saveStatus`): "Saving…" / "All changes saved" / "Autosave failed".
 - Right-drag selection flashed every node selected at the start: while the box was still a line (0 width or height), `getIntersectingNodes` matched all nodes (`overlap >= box area` with area 0). `use-selection-box` now skips selection until the box has both width and height.
+
+- Design agent failed with a `LiveblocksError` "Not Found" from `mutateFlow`. The dashboard test payload used `roomID` instead of `roomId`, so the task called `rooms/undefined`. The task now rejects a payload without a string `roomId`/`prompt` before any Liveblocks call. The Gemini key also reads `GOOGLE_AI_API_KEY` (the name in `.env.local`) when `GEMINI_API_KEY` is unset.
 
 ## Session Notes
 
