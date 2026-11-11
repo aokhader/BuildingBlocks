@@ -11,6 +11,16 @@ function createClient() {
 
 const globalForPrisma = global as unknown as { prisma?: PrismaClient };
 
-export const prisma = globalForPrisma.prisma ?? createClient();
+function getClient() {
+  if (!globalForPrisma.prisma) globalForPrisma.prisma = createClient();
+  return globalForPrisma.prisma;
+}
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+// Lazy: Trigger.dev imports task files at deploy (indexing) time, when DATABASE_URL isn't set.
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_, prop) {
+    const client = getClient();
+    const value = Reflect.get(client, prop);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
