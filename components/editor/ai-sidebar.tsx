@@ -536,7 +536,8 @@ function SpecPreviewDialog({ spec, filename, downloadUrl, onClose }: SpecPreview
       }}
       title={filename}
       description={spec ? formatDate(spec.createdAt) : undefined}
-      className="sm:max-w-2xl"
+      // Grow to fit the spec, capped at 3/5 of the screen; past that, content wraps.
+      className="sm:w-fit sm:min-w-[min(42rem,60vw)] sm:max-w-[60vw]"
       footer={
         <>
           <DialogClose asChild>
@@ -551,7 +552,9 @@ function SpecPreviewDialog({ spec, filename, downloadUrl, onClose }: SpecPreview
         </>
       }
     >
-      <ScrollArea className="h-[60vh] rounded-xl border border-surface-border bg-base">
+      {/* min-w-0 lets the grid item shrink; Radix's viewport wraps content in display:table, which
+          would grow to the widest line instead of wrapping, so force it back to block. */}
+      <ScrollArea className="h-[60vh] min-w-0 rounded-xl border border-surface-border bg-base [&_[data-radix-scroll-area-viewport]>div]:block!">
         {error ? (
           <p role="alert" className="p-4 text-sm text-error">
             {error}
